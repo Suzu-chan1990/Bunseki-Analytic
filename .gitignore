@@ -1,0 +1,21 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Backups / temporary
+*.bak
+*.tmp
+
+# Node / Composer (if used later)
+node_modules/
+vendor/
+
+# WordPress config (never commit)
+wp-config.php
