@@ -1,0 +1,193 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: Bunseki Pro 1.0\n"
+"Language: de_DE\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Dashboard"
+msgstr "Dashboard"
+
+msgid "Log Importer"
+msgstr "Log Importer"
+
+msgid "Overview"
+msgstr "🏠 Übersicht"
+
+msgid "Content & Engagement"
+msgstr "🎬 Content & Engagement"
+
+msgid "Acquisition & Tech"
+msgstr "📡 Akquise & Technik"
+
+msgid "Visitors (30d)"
+msgstr "Besucher (30d)"
+
+msgid "Views"
+msgstr "Views"
+
+msgid "Avg. Time on Page"
+msgstr "Ø Verweildauer"
+
+msgid "Active time in tab"
+msgstr "Aktive Zeit im Tab"
+
+msgid "Bot Hits"
+msgstr "Bot Hits"
+
+msgid "Scanner & AI"
+msgstr "Scanner & AI"
+
+msgid "Live"
+msgstr "Live"
+
+msgid "Refresh"
+msgstr "Refresh"
+
+msgid "Traffic Stream (30 Days)"
+msgstr "Traffic Stream (30 Tage)"
+
+msgid "Human Visitors"
+msgstr "Menschliche Besucher"
+
+msgid "Bots & Crawlers"
+msgstr "Bots & Crawler"
+
+msgid "Live Right Now"
+msgstr "Jetzt gerade Live"
+
+msgid "Top Content (by Clicks)"
+msgstr "Top Content (Nach Klicks)"
+
+msgid "Not enough data yet..."
+msgstr "Noch nicht genug Daten..."
+
+msgid "Highest Time on Page (Top 5)"
+msgstr "Höchste Verweildauer (Top 5)"
+
+msgid "Top Search Terms"
+msgstr "Top Suchbegriffe"
+
+msgid "No search data..."
+msgstr "Keine Suchdaten..."
+
+msgid "Hits"
+msgstr "Treffer"
+
+msgid "Lost Chances (0 Hits)"
+msgstr "Verlorene Chancen (0 Treffer)"
+
+msgid "Traffic Sources"
+msgstr "Traffic-Quellen"
+
+msgid "Top Bots"
+msgstr "Top Bots"
+
+msgid "Top Languages"
+msgstr "Top Sprachen"
+
+msgid "Devices"
+msgstr "Devices"
+
+msgid "Bot 404"
+msgstr "Bot 404"
+
+msgid "Start Import"
+msgstr "Import starten"
+
+msgid "Absolute server path to the .log file:"
+msgstr "Absoluter Server-Pfad zur .log Datei:"
+
+msgid "Example: "
+msgstr "Beispiel: "
+
+msgid "Read & Process Log"
+msgstr "Log einlesen & verarbeiten"
+
+msgid "Automatic Background Import (Cron)"
+msgstr "Automatischer Hintergrund-Import (Cron)"
+
+msgid "Enter a path here so Bunseki automatically imports new logs every 12 hours."
+msgstr "Hinterlege hier einen Pfad, damit Bunseki neue Logs automatisch alle 12 Stunden einliest."
+
+msgid "Save Auto-Path"
+msgstr "Auto-Pfad speichern"
+
+msgid "Disable Live Bot Tracker"
+msgstr "Live Bot-Tracker deaktivieren"
+
+msgid "Check this box if you import server logs <strong>manually</strong> or via cron. This prevents bots from being counted twice (once live, once in the log)."
+msgstr "Setze hier einen Haken, wenn du Server-Logs <strong>manuell</strong> oder per Cron importierst. Das verhindert, dass Bots doppelt gezählt werden (1x Live, 1x im Log)."
+
+msgid "Save Settings"
+msgstr "Einstellungen speichern"
+
+msgid "Start..."
+msgstr "Start..."
+
+msgid "Please enter a path!"
+msgstr "Bitte gib einen Pfad an!"
+
+msgid "Reading file and processing first lines..."
+msgstr "Lese Datei und verarbeite erste Zeilen..."
+
+msgid "lines parsed and imported..."
+msgstr "Zeilen analysiert und importiert..."
+
+msgid "Import complete! ("
+msgstr "Import abgeschlossen! ("
+
+msgid "lines)"
+msgstr "Zeilen)"
+
+msgid "Error: "
+msgstr "Fehler: "
+
+msgid "Response could not be read (JSON). Check PHP error log / browser console."
+msgstr "Antwort konnte nicht gelesen werden (JSON). Prüfe PHP-Fehlerlog / Browser-Konsole."
+
+msgid "Access denied."
+msgstr "Zugriff verweigert."
+
+msgid "Invalid file path."
+msgstr "Ungültiger Dateipfad."
+
+msgid "File not found or server permissions (open_basedir) block reading."
+msgstr "Datei nicht gefunden oder Serverrechte (open_basedir) blockieren das Lesen."
+
+msgid "Could not open file."
+msgstr "Konnte Datei nicht öffnen."
+
+msgid "Unknown error"
+msgstr "Unbekannter Fehler"
+
+msgid "Usage: wp bunseki import <path-to-file>"
+msgstr "Benutzung: wp bunseki import <pfad-zur-datei>"
+
+msgid "File not found or not readable: "
+msgstr "Datei nicht gefunden oder nicht lesbar: "
+
+msgid "Importing log file: "
+msgstr "Importiere Log-Datei: "
+
+msgid "File size: "
+msgstr "Dateigröße: "
+
+msgid "Progress: %d lines processed..."
+msgstr "Fortschritt: %d Zeilen verarbeitet..."
+
+msgid "Import complete! %d lines successfully processed."
+msgstr "Import abgeschlossen! %d Zeilen erfolgreich verarbeitet."
+
+msgid "Auto-import started..."
+msgstr "Auto-Import gestartet..."
+
+msgid "No path configured in settings."
+msgstr "Kein Pfad in den Einstellungen hinterlegt."
+
+msgid "Auto-import complete."
+msgstr "Auto-Import abgeschlossen."
+
+msgid "Error reading file."
+msgstr "Fehler beim Lesen der Datei."

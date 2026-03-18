@@ -1,14 +1,14 @@
 <?php
 /**
  * Plugin Name: Bunseki Pro
- * Description: v1.0.0 - High Scale Analytics (Stealth & Secure).
- * Version: 1.0.0
+ * Description: v1.0.1 - High Scale Analytics (Stealth & Secure).
+ * Version: 1.0.1
  * Author: すずちゃん
  */
 
 if (!defined('ABSPATH')) exit;
 
-define('BUNSEKI_VERSION', '1.0.0');
+define('BUNSEKI_VERSION', '1.0.1');
 define('BUNSEKI_PATH', plugin_dir_path(__FILE__));
 define('BUNSEKI_URL', plugin_dir_url(__FILE__));
 

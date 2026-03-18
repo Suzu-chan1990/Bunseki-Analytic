@@ -18,11 +18,18 @@ if (!isset($stats_lang) || !is_array($stats_lang)) { $stats_lang = []; }
 
 if (!defined('ABSPATH')) exit;
 
+
+// Option für den Live-Bot Tracker registrieren
+add_action('admin_init', 'bunseki_register_live_bot_setting');
+function bunseki_register_live_bot_setting() {
+    register_setting('bunseki_importer_group', 'bunseki_disable_live_bots');
+}
+
 add_action('admin_menu', 'bunseki_menu');
 function bunseki_menu() {
     add_menu_page('Bunseki', 'Bunseki', 'manage_options', 'bunseki-pro', 'bunseki_render_page', 'dashicons-chart-bar', 2);
-    add_submenu_page('bunseki-pro', 'Dashboard', 'Dashboard', 'manage_options', 'bunseki-pro', 'bunseki_render_page');
-    add_submenu_page('bunseki-pro', 'Log Importer', 'Log Importer', 'manage_options', 'bunseki-importer', 'bunseki_render_importer'); // Disabled: Log Importer replaced by Live Bot Tracker
+    add_submenu_page('bunseki-pro', __('Dashboard', 'bunseki-pro'), __('Dashboard', 'bunseki-pro'), 'manage_options', 'bunseki-pro', 'bunseki_render_page');
+    add_submenu_page('bunseki-pro', __('Log Importer', 'bunseki-pro'), __('Log Importer', 'bunseki-pro'), 'manage_options', 'bunseki-importer', 'bunseki_render_importer'); // Disabled: Log Importer replaced by Live Bot Tracker
 }
 
 add_action('admin_enqueue_scripts', 'bunseki_styles');
@@ -144,42 +151,42 @@ function bunseki_render_page() {
         <div class="bun-header">
             <h1 class="bun-title">📊 Bunseki <span class="bun-badge">v<?php echo BUNSEKI_VERSION; ?></span></h1>
             <div style="display:flex; gap:10px;">
-                <a href="?page=bunseki-pro&refresh=1" class="page-title-action">🔄 Refresh</a>
-                <div class="bun-live <?php echo ($live > 0) ? 'active' : ''; ?>"><span class="dot"></span> <?php echo $live; ?> Live</div>
+                <a href="?page=bunseki-pro&refresh=1" class="page-title-action">🔄 <?php esc_html_e('Refresh', 'bunseki-pro'); ?></a>
+                <div class="bun-live <?php echo ($live > 0) ? 'active' : ''; ?>"><span class="dot"></span> <?php echo $live; ?> <?php esc_html_e('Live', 'bunseki-pro'); ?></div>
             </div>
         </div>
 
         <div class="bun-tabs-nav">
-            <div class="bun-tab active" data-target="tab-overview">🏠 Übersicht</div>
-            <div class="bun-tab" data-target="tab-content">🎬 Content & Engagement</div>
-            <div class="bun-tab" data-target="tab-tech">📡 Akquise & Technik</div>
+            <div class="bun-tab active" data-target="tab-overview">🏠 <?php esc_html_e('Overview', 'bunseki-pro'); ?></div>
+            <div class="bun-tab" data-target="tab-content">🎬 <?php esc_html_e('Content & Engagement', 'bunseki-pro'); ?></div>
+            <div class="bun-tab" data-target="tab-tech">📡 <?php esc_html_e('Acquisition & Tech', 'bunseki-pro'); ?></div>
         </div>
 
         <div id="tab-overview" class="bun-tab-content active">
             <div class="bun-grid-kpi">
                 <div class="bun-card kpi">
-                    <div class="lbl">Besucher (30d)</div>
+                    <div class="lbl"><?php esc_html_e('Visitors (30d)', 'bunseki-pro'); ?></div>
                     <div class="val"><?php echo number_format($visitors); ?></div>
-                    <div class="sub"><?php echo number_format($views); ?> Views</div>
+                    <div class="sub"><?php echo number_format($views); ?> <?php esc_html_e('Views', 'bunseki-pro'); ?></div>
                 </div>
                 <div class="bun-card kpi" style="border-left: 4px solid #8b5cf6;">
-                    <div class="lbl">Ø Verweildauer</div>
+                    <div class="lbl"><?php esc_html_e('Avg. Time on Page', 'bunseki-pro'); ?></div>
                     <div class="val" style="color:#8b5cf6;"><?php echo $time_str; ?></div>
-                    <div class="sub">Aktive Zeit im Tab</div>
+                    <div class="sub"><?php esc_html_e('Active time in tab', 'bunseki-pro'); ?></div>
                 </div>
                 <div class="bun-card kpi" style="border-left: 4px solid #0ea5e9;">
-                    <div class="lbl">Bot Hits</div>
+                    <div class="lbl"><?php esc_html_e('Bot Hits', 'bunseki-pro'); ?></div>
                     <div class="val" style="color:#0ea5e9;"><?php echo number_format($bot_hits); ?></div>
-                    <div class="sub">Scanner & AI</div>
+                    <div class="sub"><?php esc_html_e('Scanner & AI', 'bunseki-pro'); ?></div>
                 </div>
             </div>
 
             <div class="bun-card chart-card" style="margin-bottom:25px;">
                 <h3 style="display:flex; justify-content:space-between; align-items:center;">
-                    <span>📈 Traffic Stream (30 Tage)</span>
+                    <span>📈 <?php esc_html_e('Traffic Stream (30 Days)', 'bunseki-pro'); ?></span>
                     <span style="font-size:13px; font-weight:normal; color:#64748b;">
-                        <span style="color:#3b82f6;">■</span> Menschliche Besucher &nbsp;&nbsp; 
-                        <span style="color:#cbd5e1;">■</span> Bots & Crawler
+                        <span style="color:#3b82f6;">■</span> <?php esc_html_e('Human Visitors', 'bunseki-pro'); ?> &nbsp;&nbsp; 
+                        <span style="color:#cbd5e1;">■</span> <?php esc_html_e('Bots & Crawlers', 'bunseki-pro'); ?>
                     </span>
                 </h3>
                 <div class="bun-chart" style="height: 320px; padding-bottom: 5px;">
@@ -206,7 +213,7 @@ function bunseki_render_page() {
                 <div class="bun-stack">
                     <?php if($live > 0 && !empty($live_pages)): ?>
                     <div class="bun-card" style="border-left: 4px solid #ef4444; background: #fff5f5;">
-                        <h3 style="color: #b91c1c; margin-top:0; border-bottom: 1px solid #fecaca; padding-bottom: 15px;"><span class="dot" style="display:inline-block; width:8px; height:8px; background:#ef4444; border-radius:50%; margin-right:8px; animation: pulse 2s infinite;"></span> Jetzt gerade Live</h3>
+                        <h3 style="color: #b91c1c; margin-top:0; border-bottom: 1px solid #fecaca; padding-bottom: 15px;"><span class="dot" style="display:inline-block; width:8px; height:8px; background:#ef4444; border-radius:50%; margin-right:8px; animation: pulse 2s infinite;"></span> <?php esc_html_e('Live Right Now', 'bunseki-pro'); ?></h3>
                         <table class="bun-table">
                             <?php foreach($live_pages as $lp): ?>
                             <tr>
@@ -219,7 +226,7 @@ function bunseki_render_page() {
                     <?php endif; ?>
 
                     <div class="bun-card">
-                        <h3>🔥 Top Content (Nach Klicks)</h3>
+                        <h3>🔥 <?php esc_html_e('Top Content (by Clicks)', 'bunseki-pro'); ?></h3>
                         <table class="bun-table">
                             <?php foreach($top_pages as $p): $pct = ($views > 0) ? round(($p->c / $views) * 100) : 0; ?>
                             <tr>
@@ -234,9 +241,9 @@ function bunseki_render_page() {
                     </div>
 
                     <div class="bun-card" style="border-left: 4px solid #8b5cf6;">
-                        <h3 style="color: #6d28d9;">⏱️ Höchste Verweildauer (Top 5)</h3>
+                        <h3 style="color: #6d28d9;">⏱️ <?php esc_html_e('Highest Time on Page (Top 5)', 'bunseki-pro'); ?></h3>
                         <table class="bun-table">
-                            <?php if(empty($top_duration)) echo '<tr><td style="color:#999;">Noch nicht genug Daten...</td></tr>'; ?>
+                            <?php if(empty($top_duration)) echo '<tr><td style="color:#999;">' . esc_html__('Not enough data yet...', 'bunseki-pro') . '</td></tr>'; ?>
                             <?php foreach($top_duration as $td): 
                                 $dmins = floor($td->d / 60); $dsecs = round($td->d % 60);
                             ?>
@@ -251,14 +258,14 @@ function bunseki_render_page() {
                 
                 <div class="bun-stack">
                     <div class="bun-card">
-                        <h3>🔍 Top Suchbegriffe</h3>
+                        <h3>🔍 <?php esc_html_e('Top Search Terms', 'bunseki-pro'); ?></h3>
                         <table class="bun-table">
-                            <?php if(empty($top_search)) echo '<tr><td style="color:#999;">Keine Suchdaten...</td></tr>'; ?>
+                            <?php if(empty($top_search)) echo '<tr><td style="color:#999;">' . esc_html__('No search data...', 'bunseki-pro') . '</td></tr>'; ?>
                             <?php foreach($top_search as $s): ?>
                             <tr>
                                 <td>
                                     <?php echo esc_html($s->search_term); ?>
-                                    <?php if($s->found == 0) echo ' <span style="background:#fecaca; color:#b91c1c; font-size:10px; padding:2px 4px; border-radius:4px; margin-left:5px;">0 Treffer</span>'; ?>
+                                    <?php if($s->found == 0) echo ' <span style="background:#fecaca; color:#b91c1c; font-size:10px; padding:2px 4px; border-radius:4px; margin-left:5px;">0 ' . esc_html__('Hits', 'bunseki-pro') . '</span>'; ?>
                                 </td>
                                 <td class="text-r"><?php echo number_format($s->c); ?></td>
                             </tr>
@@ -268,7 +275,7 @@ function bunseki_render_page() {
 
                     <?php if(!empty($lost_chances)): ?>
                     <div class="bun-card" style="border-left: 4px solid #f97316; background: #fffcf9;">
-                        <h3 style="color: #c2410c;">⚠️ Verlorene Chancen (0 Treffer)</h3>
+                        <h3 style="color: #c2410c;">⚠️ <?php esc_html_e('Lost Chances (0 Hits)', 'bunseki-pro'); ?></h3>
                         <table class="bun-table">
                             <?php foreach($lost_chances as $lc): ?>
                             <tr><td><strong><?php echo esc_html($lc->search_term); ?></strong></td><td class="text-r"><?php echo $lc->c; ?></td></tr>
@@ -284,7 +291,7 @@ function bunseki_render_page() {
             <div class="bun-grid-main">
                 <div class="bun-stack">
                     <div class="bun-card">
-                        <h3>🌍 Traffic-Quellen</h3>
+                        <h3>🌍 <?php esc_html_e('Traffic Sources', 'bunseki-pro'); ?></h3>
                         <table class="bun-table">
                             <?php foreach($top_refs as $r): $pct = ($views > 0) ? round(($r->c / $views) * 100) : 0; ?>
                             <tr>
@@ -299,7 +306,7 @@ function bunseki_render_page() {
                     </div>
 
                     <div class="bun-card">
-                        <h3>🤖 Top Bots</h3>
+                        <h3>🤖 <?php esc_html_e('Top Bots', 'bunseki-pro'); ?></h3>
                         <table class="bun-table">
                             <?php foreach($top_bots as $b): $pct = ($bot_hits > 0) ? round(($b->h / $bot_hits) * 100) : 0; ?>
                             <tr>
@@ -316,7 +323,7 @@ function bunseki_render_page() {
                 
                 <div class="bun-stack">
                     <div class="bun-card">
-                        <h3>🌍 Top Sprachen</h3><table class='bun-table'><?php foreach($stats_lang as $l): ?><tr><td><?php echo $l->lang; ?></td><td class='text-r'><?php echo $l->c; ?></td></tr><?php endforeach; ?></table><br><h3>📱 Devices</h3>
+                        <h3>🌍 <?php esc_html_e('Top Languages', 'bunseki-pro'); ?></h3><table class='bun-table'><?php foreach($stats_lang as $l): ?><tr><td><?php echo $l->lang; ?></td><td class='text-r'><?php echo $l->c; ?></td></tr><?php endforeach; ?></table><br><h3>📱 <?php esc_html_e('Devices', 'bunseki-pro'); ?></h3>
                         <table class="bun-table">
                             <?php foreach($stats_device as $d): ?>
                             <tr><td><?php echo $d->device; ?></td><td class="text-r"><?php echo $d->c; ?></td></tr>
@@ -326,7 +333,7 @@ function bunseki_render_page() {
                     
                     <?php if(!empty($bot_404)): ?>
                     <div class="bun-card" style="border-left: 4px solid #ef4444; background:#fffafa;">
-                        <h3 style="color:#b91c1c;">⚠️ Bot 404</h3>
+                        <h3 style="color:#b91c1c;">⚠️ <?php esc_html_e('Bot 404', 'bunseki-pro'); ?></h3>
                         <table class="bun-table">
                             <?php foreach($bot_404 as $p): ?>
                             <tr><td class="trunc" style="color:#dc2626;"><?php echo esc_html($p->url); ?></td><td class="text-r"><?php echo $p->h; ?></td></tr>
@@ -349,31 +356,41 @@ function bunseki_render_importer() {
         <h1 style="font-weight: 800; font-size: 26px; display:flex; align-items:center; gap:10px;">
             📁 Access Log Importer
         </h1>
-        <p style="color: #64748b; font-size: 15px;">Importiere historische Apache- oder Nginx-Access-Logs (.log) direkt in die Bunseki Datenbank. Das System liest die Datei in ressourcenschonenden Blöcken ein, sodass auch gigantische Logs deinen Server nicht zum Absturz bringen.</p>
+        <p style="color: #64748b; font-size: 15px;"><?php esc_html_e('Import historical Apache or Nginx access logs (.log) directly into the Bunseki database. The system reads the file in resource-friendly chunks so that even gigantic logs will not crash your server.', 'bunseki-pro'); ?></p>
         
         <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 25px; margin-top: 25px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            <h3 style="margin-top: 0; font-size: 16px; border-bottom: 1px solid #f1f5f9; padding-bottom: 15px;">Import starten</h3>
+            <h3 style="margin-top: 0; font-size: 16px; border-bottom: 1px solid #f1f5f9; padding-bottom: 15px;"><?php esc_html_e('Start Import', 'bunseki-pro'); ?></h3>
             <p>
-                <label for="log_path" style="font-weight: 600; color: #334155;">Absoluter Server-Pfad zur .log Datei:</label><br>
+                <label for="log_path" style="font-weight: 600; color: #334155;"><?php esc_html_e('Absolute server path to the .log file:', 'bunseki-pro'); ?></label><br>
                 <input type="text" id="log_path" value="<?php echo esc_attr(ABSPATH . 'access.log'); ?>" style="width:100%; margin: 10px 0; padding: 8px; font-family: monospace; border: 1px solid #cbd5e1; border-radius: 6px;">
                 <input type="hidden" id="bunseki_import_nonce" value="<?php echo esc_attr($nonce); ?>">
-                <small style="color: #94a3b8;">Beispiel: <code>/var/log/nginx/access.log</code> oder <code>/www/htdocs/w0123/logs/access.log</code></small>
+                <small style="color: #94a3b8;"><?php esc_html_e('Example: ', 'bunseki-pro'); ?><code>/var/log/nginx/access.log</code> oder <code>/www/htdocs/w0123/logs/access.log</code></small>
             </p>
             
-            <button id="btn-import" class="button button-primary button-large" onclick="startImport()" style="margin-top: 15px;">Log einlesen & verarbeiten</button>
+            <button id="btn-import" class="button button-primary button-large" onclick="startImport()" style="margin-top: 15px;"><?php esc_html_e('Read & Process Log', 'bunseki-pro'); ?></button>
             
             <div style="margin-top: 30px; padding-top: 20px; border-top: 2px dashed #e2e8f0;">
-                <h3 style="font-size: 14px;">Automatischer Hintergrund-Import (Cron)</h3>
+                <h3 style="font-size: 14px;"><?php esc_html_e('Automatic Background Import (Cron)', 'bunseki-pro'); ?></h3>
                 <form method="post" action="options.php">
                     <?php settings_fields('bunseki_importer_group'); ?>
-                    <p>Hinterlege hier einen Pfad, damit Bunseki neue Logs automatisch alle 12 Stunden einliest.</p>
+                    <p><?php esc_html_e('Enter a path here so Bunseki automatically imports new logs every 12 hours.', 'bunseki-pro'); ?></p>
                     <input type="text" name="bunseki_auto_log_path" value="<?php echo esc_attr(get_option('bunseki_auto_log_path')); ?>" style="width:100%; padding:8px;">
-                    <?php submit_button('Auto-Pfad speichern'); ?>
+                    
+                    <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #e2e8f0;">
+                        <label style="font-weight: 600; color: #334155; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="hidden" name="bunseki_disable_live_bots" value="0">
+                            <input type="checkbox" name="bunseki_disable_live_bots" value="1" <?php checked(get_option('bunseki_disable_live_bots', '0'), '1'); ?>>
+                            <?php esc_html_e('Disable Live Bot Tracker', 'bunseki-pro'); ?>
+                        </label>
+                        <p style="color: #64748b; font-size: 13px; margin-top: 5px; margin-bottom: 0;"><?php echo wp_kses_post(__('Check this box if you import server logs <strong>manually</strong> or via cron. This prevents bots from being counted twice (once live, once in the log).', 'bunseki-pro')); ?></p>
+                    </div>
+                    <?php submit_button(__('Save Settings', 'bunseki-pro')); ?>
+
                 </form>
             </div>
 
             <div id="import-progress" style="display:none; margin-top: 25px;">
-                <p id="import-status" style="font-weight:600; color:#0f1720;">Start...</p>
+                <p id="import-status" style="font-weight:600; color:#0f1720;"><?php esc_html_e('Start...', 'bunseki-pro'); ?></p>
                 <div style="width:100%; height:12px; background:#e2e8f0; border-radius:99px; overflow:hidden;">
                     <div id="import-bar" style="height:100%; width:0%; background:#06b6d4;"></div>
                 </div>
@@ -387,11 +404,11 @@ function bunseki_render_importer() {
 
     function startImport() {
         var file = document.getElementById('log_path').value;
-        if(!file) { alert('Bitte gib einen Pfad an!'); return; }
+        if(!file) { alert('<?php echo esc_js(__("Please enter a path!", "bunseki-pro")); ?>'); return; }
 
         document.getElementById('btn-import').disabled = true;
         document.getElementById('import-progress').style.display = 'block';
-        document.getElementById('import-status').innerText = 'Lese Datei und verarbeite erste Zeilen...';
+        document.getElementById('import-status').innerText = '<?php echo esc_js(__("Reading file and processing first lines...", "bunseki-pro")); ?>';
 
         importOffset = 0;
         totalParsed = 0;
@@ -411,11 +428,11 @@ function bunseki_render_importer() {
             if(data && data.success) {
                 importOffset = data.data.offset;
                 totalParsed += data.data.parsed;
-                document.getElementById('import-status').innerText = totalParsed + ' Zeilen analysiert und importiert...';
+                document.getElementById('import-status').innerText = totalParsed + ' <?php echo esc_js(__("lines parsed and imported...", "bunseki-pro")); ?>';
 
                 if(data.data.done) {
                     document.getElementById('import-bar').style.width = '100%';
-                    document.getElementById('import-status').innerText = '✅ Import abgeschlossen! (' + totalParsed + ' Zeilen)';
+                    document.getElementById('import-status').innerText = '✅ <?php echo esc_js(__("Import complete! (", "bunseki-pro")); ?>' + totalParsed + ' <?php echo esc_js(__("lines)", "bunseki-pro")); ?>';
                     document.getElementById('btn-import').disabled = false;
                 } else {
                     // Optional simple progress animation (unknown total)
@@ -424,12 +441,12 @@ function bunseki_render_importer() {
                     processChunk(file);
                 }
             } else {
-                var msg = (data && data.data) ? data.data : ((data && data.message) ? data.message : 'Unbekannter Fehler');
-                alert('Fehler: ' + msg);
+                var msg = (data && data.data) ? data.data : ((data && data.message) ? data.message : __('Unknown error', 'bunseki-pro'));
+                alert('<?php echo esc_js(__("Error: ", "bunseki-pro")); ?>' + msg);
                 document.getElementById('btn-import').disabled = false;
             }
         }).catch(err => {
-            alert('Antwort konnte nicht gelesen werden (JSON). Prüfe PHP-Fehlerlog / Browser-Konsole.');
+            alert('<?php echo esc_js(__("Response could not be read (JSON). Check PHP error log / browser console.", "bunseki-pro")); ?>');
             console.error(err);
             document.getElementById('btn-import').disabled = false;
         });
@@ -442,7 +459,7 @@ function bunseki_render_importer() {
 // --- AJAX BATCH PROCESSOR ---
 add_action('wp_ajax_bunseki_import_log', 'bunseki_ajax_import_log');
 function bunseki_ajax_import_log() {
-    if (!current_user_can('manage_options')) wp_send_json_error('Zugriff verweigert.');
+    if (!current_user_can('manage_options')) wp_send_json_error(__('Access denied.', 'bunseki-pro'));
 
     // CSRF-Schutz
     check_ajax_referer('bunseki_import_log', 'nonce');
@@ -455,19 +472,19 @@ function bunseki_ajax_import_log() {
     $allowed_base = $auto_path ? realpath(dirname($auto_path)) : realpath(ABSPATH);
     $real_file = realpath($file);
     if (!$real_file || !$allowed_base || strncmp($real_file, $allowed_base . DIRECTORY_SEPARATOR, strlen($allowed_base) + 1) !== 0) {
-        wp_send_json_error('Ungültiger Dateipfad.');
+        wp_send_json_error(__('Invalid file path.', 'bunseki-pro'));
     }
     $file = $real_file;
     // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotValidated
     $offset = intval($_POST['offset']);
     
     if (!file_exists($file) || !is_readable($file)) {
-        wp_send_json_error('Datei nicht gefunden oder Serverrechte (open_basedir) blockieren das Lesen.');
+        wp_send_json_error(__('File not found or server permissions (open_basedir) block reading.', 'bunseki-pro'));
     }
     
     // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
     $handle = fopen($file, 'r');
-    if (!$handle) wp_send_json_error('Konnte Datei nicht öffnen.');
+    if (!$handle) wp_send_json_error(__('Could not open file.', 'bunseki-pro'));
     
     if ($offset > 0) fseek($handle, $offset);
     
