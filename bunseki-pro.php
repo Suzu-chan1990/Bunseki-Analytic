@@ -1,26 +1,26 @@
 <?php
 /**
  * Plugin Name: Bunseki Pro
- * Description: v1.0.1 - High Scale Analytics (Stealth & Secure).
- * Version: 1.0.1
+ * Description: v1.0.2 - High Scale Analytics (Stealth & Secure).
+ * Version: 1.0.2
  * Author: すずちゃん
  */
 
 if (!defined('ABSPATH')) exit;
 
-define('BUNSEKI_VERSION', '1.0.1');
+define('BUNSEKI_VERSION', '1.0.2');
 define('BUNSEKI_PATH', plugin_dir_path(__FILE__));
 define('BUNSEKI_URL', plugin_dir_url(__FILE__));
 
-require_once BUNSEKI_PATH . 'inc/install.php';
-require_once BUNSEKI_PATH . 'inc/common.php';
+require_once plugin_dir_path(__FILE__) . 'inc/install.php';
+require_once plugin_dir_path(__FILE__) . 'inc/common.php';
 
 if (is_admin()) {
-    require_once BUNSEKI_PATH . 'inc/admin.php';
+    require_once plugin_dir_path(__FILE__) . 'inc/admin.php';
 }
 
 if (defined('WP_CLI') && WP_CLI) {
-    require_once BUNSEKI_PATH . 'inc/cli.php';
+    require_once plugin_dir_path(__FILE__) . 'inc/cli.php';
 }
 
 add_action('wp_enqueue_scripts', 'bunseki_enqueue_tracker');
@@ -39,7 +39,7 @@ add_action('bunseki_auto_import_event', 'bunseki_auto_import_cron');
 function bunseki_auto_import_cron() {
     $path = get_option('bunseki_auto_log_path');
     if (!$path || !file_exists($path)) return;
-    if (!class_exists('Bunseki_CLI')) require_once BUNSEKI_PATH . 'inc/cli.php';
+    if (!class_exists('Bunseki_CLI')) require_once plugin_dir_path(__FILE__) . 'inc/cli.php';
     $cli = new Bunseki_CLI();
     $cli->parse_log([$path], []);
 }
@@ -87,7 +87,7 @@ add_action('init', function () {
         return;
     }
 
-    $puc_path = TEGATAI_PATH . 'lib/plugin-update-checker/plugin-update-checker.php';
+    $puc_path = plugin_dir_url(__FILE__) . 'lib/plugin-update-checker/plugin-update-checker.php';
     if ( ! file_exists($puc_path) ) {
         return; // Library fehlt
     }
@@ -108,5 +108,5 @@ add_action('init', function () {
     // $updateChecker->setBranch('main');
 
     // Optional: falls dein Hauptplugin nicht im Repo-Root läge (bei dir liegt es im Root -> passt)
-    // $updateChecker->setPluginFileName('tegatai-secure.php');
+    // $updateChecker->setPluginFileName('bunseki-pro.php');
 });

@@ -143,8 +143,8 @@ function bunseki_render_page() {
     // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.NoCaching
     $live_pages = $wpdb->get_results("SELECT url, COUNT(DISTINCT hash) as c FROM " . $wpdb->prefix . "bunseki_log WHERE time > '$two_hours_ago' AND DATE_ADD(time, INTERVAL duration SECOND) > '$five_mins_ago' AND status = 200 AND url NOT LIKE '%//%' AND url != '' GROUP BY url ORDER BY c DESC LIMIT 10");
 
-    $mins = floor($avg_duration / 60);
-    $secs = round($avg_duration % 60);
+    $mins = floor((float)$avg_duration / 60);
+    $secs = (int)round((float)$avg_duration) % 60;
     $time_str = $mins . 'm ' . $secs . 's';
     ?>
     <div class="bun-wrap">
