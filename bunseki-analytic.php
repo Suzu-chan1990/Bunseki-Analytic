@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Bunseki Analytic
  * Description: High Scale Analytics (Stealth & Secure).
- * Version: 1.1.1
+ * Version: 1.1.2
  * Author: Saguya
  * License: GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -10,7 +10,7 @@
 
 if (!defined('ABSPATH')) exit;
 
-define('BUNSEKI_VERSION', '1.1.1');
+define('BUNSEKI_VERSION', '1.1.2');
 define('BUNSEKI_PATH', plugin_dir_path(__FILE__));
 define('BUNSEKI_URL', plugin_dir_url(__FILE__));
 
@@ -212,7 +212,7 @@ function bunseki_add_db_indexes_once() {
 /**
  * Bypass cache and optimization plugins by adding HTML attributes.
  *
- * @since 1.1.1
+ * @since 1.1.2
  *
  * @param string $tag    The script tag.
  * @param string $handle The script handle.
@@ -239,7 +239,7 @@ add_filter( 'flying_scripts_exclude_keywords', 'bunseki_exclude_js_php' );
 /**
  * Exclude JS from delay/defer for various PHP-based filter plugins.
  *
- * @since 1.1.1
+ * @since 1.1.2
  *
  * @param array|string $exclusions Array or comma-separated string of exclusions.
  * @return array|string Modified exclusions.

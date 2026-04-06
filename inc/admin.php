@@ -1,5 +1,13 @@
 <?php
+if ( ! defined( 'ABSPATH' ) ) exit;
 
+// AUTO PATCH V2: Chart.js sauber einbinden
+add_action( 'admin_enqueue_scripts', 'bunseki_enqueue_chart_js' );
+function bunseki_enqueue_chart_js( $hook ) {
+    if ( strpos( $hook, 'bunseki-analytic' ) !== false ) {
+        wp_enqueue_script( 'chart-js', BUNSEKI_URL . 'js/chart.min.js', [], '4.0.0', true );
+    }
+}
 // AUTO PATCH: wp_enqueue_style anstelle von hardcodiertem HTML
 add_action( 'admin_enqueue_scripts', 'bunseki_enqueue_admin_assets' );
 function bunseki_enqueue_admin_assets( $hook ) {
@@ -27,9 +35,6 @@ if (!isset($top_events) || !is_array($top_events)) { $top_events = []; }
 // AUTO PATCH: stats_lang guard
 // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
 if (!isset($stats_lang) || !is_array($stats_lang)) { $stats_lang = []; }
-
-if (!defined('ABSPATH')) exit;
-
 
 // Option für den Live-Bot Tracker registrieren
 add_action('admin_init', 'bunseki_register_live_bot_setting');
@@ -212,7 +217,7 @@ function bunseki_render_page() {
                 </select>
             </form>
             <a href="?page=bunseki-analytic&refresh=1&range=<?php echo esc_attr($range); ?>" class="page-title-action">🔄 <?php esc_html_e('Refresh', 'bunseki-analytic'); ?></a>
-                <a href="?page=bunseki-analytic&bunseki_export=1&range=<?php echo esc_attr($range); ?>" class="page-title-action" target="_blank" style="background:#10b981; color:#fff; border-color:#059669;">📥 <?php esc_html_e('Export CSV', 'bunseki-analytic'); ?></a>
+                <a href="<?php echo esc_url( admin_url( "admin.php?page=bunseki-analytic&bunseki_export=1&range=" . $range ) ); ?>" class="page-title-action" target="_blank" style="background:#10b981; color:#fff; border-color:#059669;">📥 <?php esc_html_e('Export CSV', 'bunseki-analytic'); ?></a>
                 <div class="bun-live <?php echo ($live > 0) ? 'active' : ''; ?>"><span class="dot"></span> <?php echo esc_html($live); ?> <?php esc_html_e('Live', 'bunseki-analytic'); ?></div>
             </div>
         </div>
