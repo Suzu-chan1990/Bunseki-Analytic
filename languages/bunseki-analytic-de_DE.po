@@ -1,0 +1,277 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: Bunseki Analytic 1.0\n"
+"Language: de_DE\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Dashboard"
+msgstr "Dashboard"
+
+msgid "Log Importer"
+msgstr "Log Importer"
+
+msgid "Overview"
+msgstr "🏠 Übersicht"
+
+msgid "Content & Engagement"
+msgstr "🎬 Content & Engagement"
+
+msgid "Acquisition & Tech"
+msgstr "📡 Akquise & Technik"
+
+
+
+msgid "Views"
+msgstr "Views"
+
+msgid "Avg. Time on Page"
+msgstr "Ø Verweildauer"
+
+msgid "Active time in tab"
+msgstr "Aktive Zeit im Tab"
+
+msgid "Bot Hits"
+msgstr "Bot Hits"
+
+msgid "Scanner & AI"
+msgstr "Scanner & AI"
+
+msgid "Live"
+msgstr "Live"
+
+msgid "Refresh"
+msgstr "Refresh"
+
+
+
+msgid "Human Visitors"
+msgstr "Menschliche Besucher"
+
+msgid "Bots & Crawlers"
+msgstr "Bots & Crawler"
+
+msgid "Live Right Now"
+msgstr "Jetzt gerade Live"
+
+msgid "Top Content (by Clicks)"
+msgstr "Top Content (Nach Klicks)"
+
+msgid "Not enough data yet..."
+msgstr "Noch nicht genug Daten..."
+
+msgid "Highest Time on Page (Top 5)"
+msgstr "Höchste Verweildauer (Top 5)"
+
+msgid "Top Search Terms"
+msgstr "Top Suchbegriffe"
+
+msgid "No search data..."
+msgstr "Keine Suchdaten..."
+
+msgid "Hits"
+msgstr "Treffer"
+
+msgid "Lost Chances (0 Hits)"
+msgstr "Verlorene Chancen (0 Treffer)"
+
+msgid "Traffic Sources"
+msgstr "Traffic-Quellen"
+
+msgid "Top Bots"
+msgstr "Top Bots"
+
+msgid "Top Languages"
+msgstr "Top Sprachen"
+
+msgid "Devices"
+msgstr "Devices"
+
+msgid "Bot 404"
+msgstr "Bot 404"
+
+msgid "Start Import"
+msgstr "Import starten"
+
+msgid "Absolute server path to the .log file:"
+msgstr "Absoluter Server-Pfad zur .log Datei:"
+
+msgid "Example: "
+msgstr "Beispiel: "
+
+msgid "Read & Process Log"
+msgstr "Log einlesen & verarbeiten"
+
+msgid "Automatic Background Import (Cron)"
+msgstr "Automatischer Hintergrund-Import (Cron)"
+
+msgid "Enter a path here so Bunseki automatically imports new logs every 12 hours."
+msgstr "Hinterlege hier einen Pfad, damit Bunseki neue Logs automatisch alle 12 Stunden einliest."
+
+msgid "Save Auto-Path"
+msgstr "Auto-Pfad speichern"
+
+msgid "Disable Live Bot Tracker"
+msgstr "Live Bot-Tracker deaktivieren"
+
+msgid "Check this box if you import server logs <strong>manually</strong> or via cron. This prevents bots from being counted twice (once live, once in the log)."
+msgstr "Setze hier einen Haken, wenn du Server-Logs <strong>manuell</strong> oder per Cron importierst. Das verhindert, dass Bots doppelt gezählt werden (1x Live, 1x im Log)."
+
+msgid "Save Settings"
+msgstr "Einstellungen speichern"
+
+msgid "Start..."
+msgstr "Start..."
+
+msgid "Please enter a path!"
+msgstr "Bitte gib einen Pfad an!"
+
+msgid "Reading file and processing first lines..."
+msgstr "Lese Datei und verarbeite erste Zeilen..."
+
+msgid "lines parsed and imported..."
+msgstr "Zeilen analysiert und importiert..."
+
+msgid "Import complete! ("
+msgstr "Import abgeschlossen! ("
+
+msgid "lines)"
+msgstr "Zeilen)"
+
+msgid "Error: "
+msgstr "Fehler: "
+
+msgid "Response could not be read (JSON). Check PHP error log / browser console."
+msgstr "Antwort konnte nicht gelesen werden (JSON). Prüfe PHP-Fehlerlog / Browser-Konsole."
+
+msgid "Access denied."
+msgstr "Zugriff verweigert."
+
+msgid "Invalid file path."
+msgstr "Ungültiger Dateipfad."
+
+msgid "File not found or server permissions (open_basedir) block reading."
+msgstr "Datei nicht gefunden oder Serverrechte (open_basedir) blockieren das Lesen."
+
+msgid "Could not open file."
+msgstr "Konnte Datei nicht öffnen."
+
+msgid "Unknown error"
+msgstr "Unbekannter Fehler"
+
+msgid "Usage: wp bunseki import <path-to-file>"
+msgstr "Benutzung: wp bunseki import <pfad-zur-datei>"
+
+msgid "File not found or not readable: "
+msgstr "Datei nicht gefunden oder nicht lesbar: "
+
+msgid "Importing log file: "
+msgstr "Importiere Log-Datei: "
+
+msgid "File size: "
+msgstr "Dateigröße: "
+
+msgid "Progress: %d lines processed..."
+msgstr "Fortschritt: %d Zeilen verarbeitet..."
+
+msgid "Import complete! %d lines successfully processed."
+msgstr "Import abgeschlossen! %d Zeilen erfolgreich verarbeitet."
+
+msgid "Auto-import started..."
+msgstr "Auto-Import gestartet..."
+
+msgid "No path configured in settings."
+msgstr "Kein Pfad in den Einstellungen hinterlegt."
+
+msgid "Auto-import complete."
+msgstr "Auto-Import abgeschlossen."
+
+msgid "Error reading file."
+msgstr "Fehler beim Lesen der Datei."
+
+msgid "Last 30 Days"
+msgstr "Letzte 30 Tage"
+
+msgid "Last 60 Days"
+msgstr "Letzte 60 Tage"
+
+msgid "Last 90 Days"
+msgstr "Letzte 90 Tage"
+
+msgid "Last 120 Days"
+msgstr "Letzte 120 Tage"
+
+msgid "All Time"
+msgstr "Komplett"
+
+msgid "Visitors (%s)"
+msgstr "Besucher (%s)"
+
+msgid "Traffic Stream (%s)"
+msgstr "Traffic-Verlauf (%s)"
+
+msgid "Export CSV"
+msgstr "CSV Exportieren"
+
+msgid "Settings"
+msgstr "Einstellungen"
+
+msgid "Security & Firewall"
+msgstr "Sicherheit & Firewall"
+
+msgid "Block AI-Scrapers & Bad Bots"
+msgstr "KI-Scraper & Bad Bots blockieren"
+
+msgid "When activated, Bunseki acts as a firewall. It instantly returns a 403 Forbidden status to known AI training bots (like GPTBot, ClaudeBot, ByteSpider) and aggressive generic scrapers. This protects your content and saves massive server bandwidth. Good bots (Google, Bing) are still allowed."
+msgstr "Wenn aktiviert, agiert Bunseki als Firewall. Es blockiert sofort bekannte KI-Trainings-Bots (wie GPTBot, ClaudeBot, ByteSpider) sowie aggressive generische Scraper mit einem 403 Forbidden Status. Das schützt deine Inhalte und spart massiv Server-Ressourcen. Gute Bots (Google, Bing) sind weiterhin erlaubt."
+
+msgid "GDPR / DSGVO Opt-Out"
+msgstr "DSGVO / GDPR Opt-Out"
+
+msgid "Bunseki is highly privacy-focused. However, to provide a legally compliant privacy policy, you can allow users to opt-out of tracking entirely."
+msgstr "Bunseki ist extrem datenschutzfreundlich. Um jedoch eine 100% rechtssichere Datenschutzerklärung anzubieten, kannst du Nutzern die Möglichkeit geben, dem Tracking komplett zu widersprechen."
+
+msgid "Simply copy this shortcode and paste it anywhere on your Privacy Policy page:"
+msgstr "Kopiere einfach diesen Shortcode und füge ihn auf deiner Datenschutz-Seite ein:"
+
+msgid "Click the button below to opt-out of all statistical tracking on this website."
+msgstr "Klicke auf den Button unten, um dem statistischen Tracking auf dieser Website zu widersprechen."
+
+msgid "Disable Tracking"
+msgstr "Tracking deaktivieren"
+
+msgid "Tracking disabled successfully."
+msgstr "Tracking erfolgreich deaktiviert."\n\nmsgid "Open Full Dashboard"
+msgstr "Vollständiges Dashboard öffnen"
+
+msgid "Marketing & UTM"
+msgstr "Marketing & UTM"
+
+msgid "Campaigns & Marketing (UTM Source)"
+msgstr "Kampagnen & Marketing (UTM Source)"
+
+msgid "Campaign / Source"
+msgstr "Kampagne / Quelle"
+
+msgid "No UTM campaigns tracked yet. Add ?utm_source=newsletter to your links!"
+msgstr "Noch keine UTM-Kampagnen erfasst. Hänge ?utm_source=newsletter an deine Links an!"\n\n\nmsgid "Custom Events & Downloads"
+msgstr "Individuelle Events & Downloads"
+
+msgid "Event Type"
+msgstr "Ereignistyp"
+
+msgid "Target / Value"
+msgstr "Ziel / Wert"
+
+msgid "Triggered"
+msgstr "Ausgelöst"
+
+msgid "No events tracked yet. Clicks on external links and downloads (.pdf, .zip) will appear here automatically!"
+msgstr "Noch keine Events erfasst. Klicks auf externe Links und Downloads (.pdf, .zip) erscheinen hier vollautomatisch!"
+
+msgid "📊 Bunseki: Your Weekly Traffic Report (%s Visitors)"
+msgstr "📊 Bunseki: Dein wöchentlicher Traffic-Bericht (%s Besucher)"
+
+msgid "Hello!\n\nHere is your weekly traffic summary:\n\nVisitors: %1$s\nPageviews: %2$s\n\nLog in to your dashboard for more details.\n\nYour Bunseki Analytic Plugin"
+msgstr "Hallo!\n\nHier ist deine wöchentliche Traffic-Zusammenfassung:\n\nBesucher: %1$s\nAufrufe: %2$s\n\nLogge dich in dein Dashboard ein, um mehr Details zu sehen.\n\nDein Bunseki Analytic Plugin"\n

@@ -44,3 +44,28 @@
 .bun-tab-content { display: none; animation: bunFade 0.3s ease; }
 .bun-tab-content.active { display: block; }
 @keyframes bunFade { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ==========================================================================
+   DARK MODE (Auto-adapts to OS / Browser Settings)
+   ========================================================================== */
+@media (prefers-color-scheme: dark) {
+    .bun-wrap { --b-bg: #0f172a; --b-surface: #1e293b; --b-text: #f8fafc; --b-muted: #94a3b8; --b-border: #334155; color: var(--b-text); }
+    .bun-card { background: var(--b-surface); border-color: var(--b-border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); }
+    .bun-title { color: #f8fafc; }
+    .bun-table td { border-bottom-color: var(--b-border); color: #cbd5e1; }
+    .bun-table a { color: #38bdf8; }
+    .bun-table a:hover { color: #7dd3fc; }
+    .bun-tab { background: #334155; color: #cbd5e1; border-color: #475569; }
+    .bun-tab.active { background: var(--b-primary); color: #fff; border-color: var(--b-primary); }
+    .minibar-bg { background: #334155; }
+    .minibar-fill { background: #64748b; }
+    .bun-card[style*="background: #fff5f5"] { background: #450a0a !important; border-left-color: #ef4444 !important; }
+    .bun-card[style*="background: #fff5f5"] h3 { color: #fca5a5 !important; border-bottom-color: #7f1d1d !important; }
+    .bun-card[style*="background: #fffcf9"] { background: #431407 !important; border-left-color: #f97316 !important; }
+    .bun-card[style*="background: #fffcf9"] h3 { color: #fdba74 !important; }
+    .bun-card[style*="background:#fffafa"] { background: #450a0a !important; }
+    .bun-table tr td[style*="color:#991b1b"] { color: #fca5a5 !important; }
+    .bun-table tr td[style*="color:#dc2626"] { color: #fca5a5 !important; }
+    select[name="range"] { background: #1e293b !important; color: #f8fafc !important; border-color: #475569 !important; }
+    input[type="text"] { background: #1e293b !important; color: #f8fafc !important; border-color: #475569 !important; }
+}

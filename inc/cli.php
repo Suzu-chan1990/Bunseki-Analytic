@@ -5,11 +5,12 @@ class Bunseki_CLI {
     
     public function parse_log( $args, $assoc_args ) {
         global $wpdb;
-        if (empty($args)) WP_CLI::error("Keine Datei angegeben.");
+        if (empty($args)) WP_CLI::error( __( 'No file specified.', 'bunseki-analytic' ) );
         
         foreach ($args as $file) {
             if (!file_exists($file)) {
-                WP_CLI::warning("Überspringe: Datei nicht gefunden -> $file");
+                /* translators: %s: File path */
+                WP_CLI::warning( sprintf( __( 'Skipping: File not found -> %s', 'bunseki-analytic' ), $file ) );
                 continue;
             }
             
@@ -23,7 +24,8 @@ class Bunseki_CLI {
             else { $handle = fopen($file, 'r'); if ($last_pos > 0) fseek($handle, $last_pos); }
             
             if (!$handle) {
-                WP_CLI::warning("Konnte Datei nicht öffnen: $file");
+                /* translators: %s: File path */
+                WP_CLI::warning( sprintf( __( 'Could not open file: %s', 'bunseki-analytic' ), $file ) );
                 continue;
             }
             
@@ -36,7 +38,9 @@ class Bunseki_CLI {
             $parsed = 0;
             $now = current_time('mysql');
             
-            WP_CLI::line("Starte Import von: $file (Offset: $last_pos)");
+            /* translators: 1: File path, 2: File offset */
+            
+            WP_CLI::line( sprintf( __( 'Starting import of: %1$s (Offset: %2$s)', 'bunseki-analytic' ), $file, $last_pos ) );
 
             while (($line = ($is_gzip ? gzgets($handle) : fgets($handle))) !== false) {
                 $lines++;
@@ -54,7 +58,7 @@ class Bunseki_CLI {
                     // phpcs:ignore WordPress.WP.AlternativeFunctions.parse_url_parse_url
                     $path_only = parse_url($url, PHP_URL_PATH);
                     if (preg_match('/\.(css|js|jpg|jpeg|png|gif|webp|svg|ico|woff|woff2|ttf|eot|mp4|webm|mp3)$/i', (string)$path_only)) {
-                        if (($lines % 2500) == 0) { $this->flush($batch_bots, $batch_users, $now); $batch_bots = []; $batch_users = []; WP_CLI::line("$lines gelesen | $parsed importiert..."); }
+                        if (($lines % 2500) == 0) { $this->flush($batch_bots, $batch_users, $now); $batch_bots = []; $batch_users = []; /* translators: 1: Lines read, 2: Lines imported */ WP_CLI::line( sprintf( __( '%1$d read | %2$d imported...', 'bunseki-analytic' ), $lines, $parsed ) ); }
                         continue;
                     }
 
@@ -92,7 +96,8 @@ class Bunseki_CLI {
                 if (($lines % 2500) == 0) { 
                     $this->flush($batch_bots, $batch_users, $now); 
                     $batch_bots = []; $batch_users = []; 
-                    WP_CLI::line("$lines gelesen | $parsed importiert...");
+                    /* translators: 1: Lines read, 2: Lines imported */ 
+                    WP_CLI::line( sprintf( __( '%1$d read | %2$d imported...', 'bunseki-analytic' ), $lines, $parsed ) );
                 }
             }
             
@@ -104,11 +109,12 @@ class Bunseki_CLI {
             // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
             if (!$is_gzip) { update_option($offset_key, ftell($handle)); fclose($handle); } 
             else { gzclose($handle); }
-            WP_CLI::success("  -> $file: $lines gelesen, $parsed importiert.");
+            /* translators: 1: File path, 2: Lines read, 3: Lines imported */
+            WP_CLI::success( sprintf( __( '  -> %1$s: %2$d read, %3$d imported.', 'bunseki-analytic' ), $file, $lines, $parsed ) );
         } // Ende der foreach-Schleife
         
         delete_transient('bunseki_dashboard_stats_v3');
-        WP_CLI::success("✅ Alle übergebenen Dateien wurden erfolgreich verarbeitet! Cache geleert.");
+        WP_CLI::success( __( '✅ All provided files successfully processed! Cache cleared.', 'bunseki-analytic' ) );
     }
     
     private function flush($bots, $users, $now) {
@@ -136,7 +142,7 @@ class Bunseki_CLI {
                 ]);
                 // Alarm schlagen, falls die DB den Insert blockiert
                 if ($result === false && !empty($wpdb->last_error)) {
-                    WP_CLI::error("DATENBANK FEHLER: " . $wpdb->last_error);
+                    WP_CLI::error( __( 'DATABASE ERROR: ', 'bunseki-analytic' ) . $wpdb->last_error );
                 }
             }
         }
@@ -149,7 +155,7 @@ class Bunseki_CLI {
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
         $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE 'bunseki_log_offset_%'");
         delete_transient('bunseki_dashboard_stats_v3');
-        WP_CLI::success("✅ Bunseki Datenbank & Cache komplett geleert! Das System ist bereit für einen frischen Import.");
+        WP_CLI::success( __( '✅ Bunseki database & cache completely cleared! System ready for fresh import.', 'bunseki-analytic' ) );
     }
 }
 

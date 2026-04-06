@@ -1,6 +1,6 @@
 
 window.addEventListener('load', function() {
-    if (navigator.doNotTrack === "1" || window.doNotTrack === "1") return;
+    if (navigator.doNotTrack === "1" || window.doNotTrack === "1" || document.cookie.indexOf("bunseki_dnt=1") !== -1) return;
     
     var start = new Date().getTime();
     var active_time = 0;
@@ -29,6 +29,30 @@ window.addEventListener('load', function() {
         load = perf.timing.domContentLoadedEventEnd - perf.timing.navigationStart;
     }
 
+    // Event Tracker API
+    window.bunseki = window.bunseki || {};
+    window.bunseki.track = function(name, value) {
+        if (navigator.doNotTrack === "1" || window.doNotTrack === "1" || document.cookie.indexOf("bunseki_dnt=1") !== -1) return;
+        var fd = new FormData();
+        fd.append('event_name', name);
+        fd.append('event_val', value || '');
+        fd.append('url', window.location.pathname);
+        if(navigator.sendBeacon) navigator.sendBeacon(endpoint, fd);
+    };
+
+    // Auto-Track Outbound & Downloads
+    document.addEventListener('click', function(e) {
+        var el = e.target.closest('a');
+        if(!el || !el.href) return;
+        var href = el.href;
+        var ext = href.split('?')[0].split('.').pop().toLowerCase();
+        if(['pdf','zip','rar','doc','docx','xls','xlsx'].indexOf(ext) !== -1) {
+            window.bunseki.track('Download', href);
+        } else if (el.host !== window.location.host && href.indexOf('http') === 0) {
+            window.bunseki.track('Outbound Link', href);
+        }
+    });
+
     // URL Params parsing (Search & UTM)
     var params = new URLSearchParams(window.location.search);
     var search_term = params.get('s') || '';
@@ -55,7 +79,8 @@ window.addEventListener('load', function() {
         duration: 0 // Initial 0
     };
 
-    var endpoint = config.endpoint;
+    var endpoint = window.bunsekiAjax ? window.bunsekiAjax.rest_url : '';
+    if(!endpoint) return;
 
     // Helper to send data
     function send(is_final) {

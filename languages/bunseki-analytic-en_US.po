@@ -1,0 +1,128 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: Bunseki Analytic 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-03-24 08:30+0000\n"
+"PO-Revision-Date: 2026-03-24 08:30+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: en_US\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "or"
+msgstr "or"
+
+msgid "No file specified."
+msgstr "No file specified."
+
+msgid "Skipping: File not found -> %s"
+msgstr "Skipping: File not found -> %s"
+
+msgid "Could not open file: %s"
+msgstr "Could not open file: %s"
+
+msgid "Starting import of: %1$s (Offset: %2$s)"
+msgstr "Starting import of: %1$s (Offset: %2$s)"
+
+msgid "%1$d read | %2$d imported..."
+msgstr "%1$d read | %2$d imported..."
+
+msgid "  -> %1$s: %2$d read, %3$d imported."
+msgstr "  -> %1$s: %2$d read, %3$d imported."
+
+msgid "✅ All provided files successfully processed! Cache cleared."
+msgstr "✅ All provided files successfully processed! Cache cleared."
+
+msgid "DATABASE ERROR: "
+msgstr "DATABASE ERROR: "
+
+msgid "✅ Bunseki database & cache completely cleared! System ready for fresh import."
+msgstr "✅ Bunseki database & cache completely cleared! System ready for fresh import."
+
+msgid "Last 30 Days"
+msgstr "Last 30 Days"
+
+msgid "Last 60 Days"
+msgstr "Last 60 Days"
+
+msgid "Last 90 Days"
+msgstr "Last 90 Days"
+
+msgid "Last 120 Days"
+msgstr "Last 120 Days"
+
+msgid "All Time"
+msgstr "All Time"
+
+msgid "Visitors (%s)"
+msgstr "Visitors (%s)"
+
+msgid "Traffic Stream (%s)"
+msgstr "Traffic Stream (%s)"
+
+msgid "Export CSV"
+msgstr "Export CSV"
+
+msgid "Settings"
+msgstr "Settings"
+
+msgid "Security & Firewall"
+msgstr "Security & Firewall"
+
+msgid "Block AI-Scrapers & Bad Bots"
+msgstr "Block AI-Scrapers & Bad Bots"
+
+msgid "When activated, Bunseki acts as a firewall. It instantly returns a 403 Forbidden status to known AI training bots (like GPTBot, ClaudeBot, ByteSpider) and aggressive generic scrapers. This protects your content and saves massive server bandwidth. Good bots (Google, Bing) are still allowed."
+msgstr "When activated, Bunseki acts as a firewall. It instantly returns a 403 Forbidden status to known AI training bots (like GPTBot, ClaudeBot, ByteSpider) and aggressive generic scrapers. This protects your content and saves massive server bandwidth. Good bots (Google, Bing) are still allowed."
+
+msgid "GDPR / DSGVO Opt-Out"
+msgstr "GDPR / DSGVO Opt-Out"
+
+msgid "Bunseki is highly privacy-focused. However, to provide a legally compliant privacy policy, you can allow users to opt-out of tracking entirely."
+msgstr "Bunseki is highly privacy-focused. However, to provide a legally compliant privacy policy, you can allow users to opt-out of tracking entirely."
+
+msgid "Simply copy this shortcode and paste it anywhere on your Privacy Policy page:"
+msgstr "Simply copy this shortcode and paste it anywhere on your Privacy Policy page:"
+
+msgid "Click the button below to opt-out of all statistical tracking on this website."
+msgstr "Click the button below to opt-out of all statistical tracking on this website."
+
+msgid "Disable Tracking"
+msgstr "Disable Tracking"
+
+msgid "Tracking disabled successfully."
+msgstr "Tracking disabled successfully."\n\nmsgid "Open Full Dashboard"
+msgstr "Open Full Dashboard"
+
+msgid "Marketing & UTM"
+msgstr "Marketing & UTM"
+
+msgid "Campaigns & Marketing (UTM Source)"
+msgstr "Campaigns & Marketing (UTM Source)"
+
+msgid "Campaign / Source"
+msgstr "Campaign / Source"
+
+msgid "No UTM campaigns tracked yet. Add ?utm_source=newsletter to your links!"
+msgstr "No UTM campaigns tracked yet. Add ?utm_source=newsletter to your links!"\n\n\nmsgid "Custom Events & Downloads"
+msgstr "Custom Events & Downloads"
+
+msgid "Event Type"
+msgstr "Event Type"
+
+msgid "Target / Value"
+msgstr "Target / Value"
+
+msgid "Triggered"
+msgstr "Triggered"
+
+msgid "No events tracked yet. Clicks on external links and downloads (.pdf, .zip) will appear here automatically!"
+msgstr "No events tracked yet. Clicks on external links and downloads (.pdf, .zip) will appear here automatically!"
+
+msgid "📊 Bunseki: Your Weekly Traffic Report (%s Visitors)"
+msgstr "📊 Bunseki: Your Weekly Traffic Report (%s Visitors)"
+
+msgid "Hello!\n\nHere is your weekly traffic summary:\n\nVisitors: %1$s\nPageviews: %2$s\n\nLog in to your dashboard for more details.\n\nYour Bunseki Analytic Plugin"
+msgstr "Hello!\n\nHere is your weekly traffic summary:\n\nVisitors: %1$s\nPageviews: %2$s\n\nLog in to your dashboard for more details.\n\nYour Bunseki Analytic Plugin"\n

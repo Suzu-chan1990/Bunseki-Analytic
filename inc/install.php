@@ -10,10 +10,18 @@ function bunseki_update_check() {
     }
 }
 
-register_activation_hook(dirname(__DIR__) . '/bunseki-pro.php', 'bunseki_install_db');
+register_activation_hook(dirname(__DIR__) . '/bunseki-analytic.php', 'bunseki_install_db');
 
-// phpcs:ignore PluginCheck.CodeAnalysis.SettingSanitization.register_settingMissing
-function bunseki_register_settings() { register_setting('bunseki_importer_group', 'bunseki_auto_log_path'); }
+function bunseki_register_settings() { 
+    register_setting(
+        'bunseki_importer_group', 
+        'bunseki_auto_log_path', 
+        [
+            'type'              => 'string',
+            'sanitize_callback' => 'sanitize_text_field'
+        ]
+    ); 
+}
 add_action('admin_init', 'bunseki_register_settings');
 function bunseki_install_db() {
     global $wpdb;
@@ -46,6 +54,18 @@ function bunseki_install_db() {
         KEY url (url)
     ) $charset_collate;";
 
+    $table_events = $wpdb->prefix . 'bunseki_events';
+    $sql_events = "CREATE TABLE $table_events (
+        id bigint(20) NOT NULL AUTO_INCREMENT,
+        time datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
+        event_name varchar(100) DEFAULT '' NOT NULL,
+        event_val varchar(255) DEFAULT '' NOT NULL,
+        url varchar(255) DEFAULT '' NOT NULL,
+        hash varchar(32) DEFAULT '' NOT NULL,
+        PRIMARY KEY  (id),
+        KEY time (time)
+    ) $charset_collate;";
+
     $table_bots = $wpdb->prefix . 'bunseki_bots';
     
     // FIX: Syntax für dbDelta optimiert
@@ -64,8 +84,12 @@ function bunseki_install_db() {
     require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
     dbDelta($sql_users);
     dbDelta($sql_bots);
+    dbDelta($sql_events);
     
     // Cronjob sicherstellen
+    if (!wp_next_scheduled('bunseki_weekly_email_event')) {
+        wp_schedule_event(time(), 'weekly', 'bunseki_weekly_email_event');
+    }
     if (!wp_next_scheduled('bunseki_daily_cleanup_event')) {
         wp_schedule_event(time(), 'daily', 'bunseki_daily_cleanup_event');
     }
@@ -74,7 +98,7 @@ function bunseki_install_db() {
     }
 }
 
-register_deactivation_hook(dirname(__DIR__) . '/bunseki-pro.php', 'bunseki_remove_schedule');
+register_deactivation_hook(dirname(__DIR__) . '/bunseki-analytic.php', 'bunseki_remove_schedule');
 function bunseki_remove_schedule() {
     wp_clear_scheduled_hook('bunseki_daily_cleanup_event');
 }
