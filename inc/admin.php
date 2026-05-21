@@ -36,10 +36,11 @@ if (!isset($top_events) || !is_array($top_events)) { $top_events = []; }
 // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
 if (!isset($stats_lang) || !is_array($stats_lang)) { $stats_lang = []; }
 
-// Option für den Live-Bot Tracker registrieren
-add_action('admin_init', 'bunseki_register_live_bot_setting');
-function bunseki_register_live_bot_setting() {
+// Optionen für das Settings-Tab registrieren (Bugfix: Block Bots hinzugefügt)
+add_action('admin_init', 'bunseki_register_admin_settings');
+function bunseki_register_admin_settings() {
     register_setting('bunseki_importer_group', 'bunseki_disable_live_bots', ['type' => 'integer', 'sanitize_callback' => 'absint']);
+    register_setting('bunseki_importer_group', 'bunseki_block_bots', ['type' => 'integer', 'sanitize_callback' => 'absint']);
 }
 
 add_action('admin_menu', 'bunseki_menu');
