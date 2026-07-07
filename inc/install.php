@@ -1,36 +1,42 @@
 <?php
-if (!defined('ABSPATH')) exit;
+/**
+ * Bunseki Analytic – Datenbankinstallation & Update-Check
+ *
+ * @package Bunseki_Analytic
+ * @since   1.0.0
+ */
 
-add_action('plugins_loaded', 'bunseki_update_check');
+if ( ! defined( 'ABSPATH' ) ) exit;
 
+add_action( 'plugins_loaded', 'bunseki_update_check' );
 function bunseki_update_check() {
-    if (get_option('bunseki_version') !== BUNSEKI_VERSION) {
+    if ( get_option( 'bunseki_version' ) !== BUNSEKI_VERSION ) {
         bunseki_install_db();
-        update_option('bunseki_version', BUNSEKI_VERSION);
+        update_option( 'bunseki_version', BUNSEKI_VERSION );
     }
 }
 
-register_activation_hook(dirname(__DIR__) . '/bunseki-analytic.php', 'bunseki_install_db');
+register_activation_hook( dirname( __DIR__ ) . '/bunseki-analytic.php', 'bunseki_install_db' );
 
-function bunseki_register_settings() { 
+add_action( 'admin_init', 'bunseki_register_settings' );
+function bunseki_register_settings() {
     register_setting(
-        'bunseki_importer_group', 
-        'bunseki_auto_log_path', 
+        'bunseki_importer_group',
+        'bunseki_auto_log_path',
         [
             'type'              => 'string',
-            'sanitize_callback' => 'sanitize_text_field'
+            'sanitize_callback' => 'sanitize_text_field',
         ]
-    ); 
+    );
 }
-add_action('admin_init', 'bunseki_register_settings');
+
 function bunseki_install_db() {
     global $wpdb;
     $charset_collate = $wpdb->get_charset_collate();
-    
+
+    // Haupt-Log-Tabelle
     $table_users = $wpdb->prefix . 'bunseki_log';
-    
-    // FIX: Syntax für dbDelta optimiert (Newlines wichtig!)
-    $sql_users = "CREATE TABLE $table_users (
+    $sql_users   = "CREATE TABLE $table_users (
         id bigint(20) NOT NULL AUTO_INCREMENT,
         time datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
         url varchar(255) DEFAULT '' NOT NULL,
@@ -54,8 +60,9 @@ function bunseki_install_db() {
         KEY url (url)
     ) $charset_collate;";
 
+    // Custom Events Tabelle
     $table_events = $wpdb->prefix . 'bunseki_events';
-    $sql_events = "CREATE TABLE $table_events (
+    $sql_events   = "CREATE TABLE $table_events (
         id bigint(20) NOT NULL AUTO_INCREMENT,
         time datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
         event_name varchar(100) DEFAULT '' NOT NULL,
@@ -66,10 +73,9 @@ function bunseki_install_db() {
         KEY time (time)
     ) $charset_collate;";
 
+    // Bot-Tracking Tabelle
     $table_bots = $wpdb->prefix . 'bunseki_bots';
-    
-    // FIX: Syntax für dbDelta optimiert
-    $sql_bots = "CREATE TABLE $table_bots (
+    $sql_bots   = "CREATE TABLE $table_bots (
         id bigint(20) NOT NULL AUTO_INCREMENT,
         date date DEFAULT '0000-00-00' NOT NULL,
         bot_name varchar(50) DEFAULT 'Unknown' NOT NULL,
@@ -81,24 +87,26 @@ function bunseki_install_db() {
         UNIQUE KEY bot_day_url (date, bot_name, url, status)
     ) $charset_collate;";
 
-    require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-    dbDelta($sql_users);
-    dbDelta($sql_bots);
-    dbDelta($sql_events);
-    
-    // Cronjob sicherstellen
-    if (!wp_next_scheduled('bunseki_weekly_email_event')) {
-        wp_schedule_event(time(), 'weekly', 'bunseki_weekly_email_event');
+    require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+    dbDelta( $sql_users );
+    dbDelta( $sql_bots );
+    dbDelta( $sql_events );
+
+    // Cronjobs registrieren
+    if ( ! wp_next_scheduled( 'bunseki_weekly_email_event' ) ) {
+        wp_schedule_event( time(), 'weekly', 'bunseki_weekly_email_event' );
     }
-    if (!wp_next_scheduled('bunseki_daily_cleanup_event')) {
-        wp_schedule_event(time(), 'daily', 'bunseki_daily_cleanup_event');
+    if ( ! wp_next_scheduled( 'bunseki_daily_cleanup_event' ) ) {
+        wp_schedule_event( time(), 'daily', 'bunseki_daily_cleanup_event' );
     }
-    if (!wp_next_scheduled('bunseki_auto_import_event')) {
-        wp_schedule_event(time(), 'twicedaily', 'bunseki_auto_import_event');
+    if ( ! wp_next_scheduled( 'bunseki_auto_import_event' ) ) {
+        wp_schedule_event( time(), 'twicedaily', 'bunseki_auto_import_event' );
     }
 }
 
-register_deactivation_hook(dirname(__DIR__) . '/bunseki-analytic.php', 'bunseki_remove_schedule');
+register_deactivation_hook( dirname( __DIR__ ) . '/bunseki-analytic.php', 'bunseki_remove_schedule' );
 function bunseki_remove_schedule() {
-    wp_clear_scheduled_hook('bunseki_daily_cleanup_event');
+    wp_clear_scheduled_hook( 'bunseki_daily_cleanup_event' );
+    wp_clear_scheduled_hook( 'bunseki_weekly_email_event' );
+    wp_clear_scheduled_hook( 'bunseki_auto_import_event' );
 }

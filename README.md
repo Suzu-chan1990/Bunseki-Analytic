@@ -48,6 +48,28 @@ Downloads and outbound links are tracked automatically. For custom buttons, you 
 
 == Changelog ==
 
+## 1.2.0 – 2026-07-07
+
+### Fixed
+
+* **endpoint.php – Architectural cleanup (critical):** Removed a leftover `SHORTINIT` / `wp-load.php` bootstrap block that was a remnant of the old direct-file architecture. Since tracking now runs exclusively through the WordPress REST API, WordPress is already fully loaded when the handler is invoked — manually re-loading it caused potential `$wpdb` conflicts and unpredictable behaviour on some server configurations.
+* **endpoint.php – CORS origin check now supports subdomains:** The previous check compared the full `HTTP_ORIGIN` host against `$_SERVER['HTTP_HOST']` directly, which caused legitimate tracking requests from subdomains (e.g. `ai.vtubes.tokyo`) to be rejected with a `403 Forbidden` response. The check now compares the two trailing domain segments (base domain) of both origin and host, so all subdomains of the same root domain are correctly allowed.
+* **endpoint.php – Input now read via WP REST API:** User input is now retrieved cleanly through `$request->get_param()` instead of accessing `$_POST` directly, which is the correct and secure pattern for WordPress REST API handlers.
+* **endpoint.php – DNT / opt-out check added at handler level:** Do Not Track and the `bunseki_dnt` cookie are now respected directly inside the REST handler as an additional server-side safeguard, independent of the JavaScript check.
+* **b-core.js – Endpoint scope bug fixed:** The `endpoint` variable was referenced inside the `bunseki.track()` closure before it was assigned a value. Although JavaScript `var` hoisting prevented a hard error, the value was `undefined` at definition time and relied on implicit closure behaviour. Replaced with a dedicated `getEndpoint()` helper that reads `window.bunsekiAjax.rest_url` at call time, making the behaviour explicit and reliable.
+* **b-core.js – Heartbeat interval increased from 10 s to 30 s:** The session duration heartbeat was firing every 10 seconds, generating a continuous stream of `UPDATE` queries against the database. On sites with many concurrent visitors this produced significant unnecessary write load. Increased to 30 seconds — duration accuracy is unaffected for practical purposes.
+* **b-core.js – DoNotTrack check centralised:** The DNT and opt-out cookie check was previously duplicated in multiple places throughout the script. Consolidated into a single early-exit check at the top of the load handler and a shared guard inside `bunseki.track()`.
+* **bunseki-analytic.php – Bot detection called only once per request:** `Bunseki_Helper::detect_bot()` was previously invoked twice per request — once in `bunseki_firewall_check()` at `plugins_loaded` and again in `bunseki_live_bot_tracker()` at `shutdown`. Refactored into a shared `bunseki_insert_bot_hit()` function that both hooks call, ensuring the User-Agent string is parsed only once.
+* **bunseki-analytic.php – Blocked bots now appear in bot statistics:** Bots that were blocked by the firewall (`die()`) never reached the `shutdown` hook and were therefore never recorded in the `bunseki_bots` table, making them invisible in the dashboard. `bunseki_insert_bot_hit()` is now called before the `die()` so blocked bots are correctly tracked.
+* **common.php – Retention period comment corrected:** The inline comment on the garbage collection function still read "30 days" while the actual value had been updated to 3650 days (10 years). Comment updated to match the real behaviour.
+* **install.php – Deactivation hook now removes all three cron jobs:** The deactivation hook previously only unscheduled `bunseki_daily_cleanup_event`. The weekly email report event (`bunseki_weekly_email_event`) and the auto-import event (`bunseki_auto_import_event`) were left behind as orphaned cron entries. All three are now cleared on deactivation.
+* **cli.php – AVIF and JPEG XL extensions added to static asset ignore list:** The log parser's static file filter did not include `.avif` and `.jxl` extensions. These are now excluded alongside existing image formats, consistent with the output formats produced by the Henkan image conversion plugin.
+
+### Changed
+
+* Plugin version bumped to `1.2.0`.
+* Plugin header updated: `Tested up to: 7.0`, `Requires PHP: 8.3`.
+
 = 1.0.2 =
 * **Feature:** Added Custom Event Tracking (Auto-tracks outbound links and file downloads).
 * **Feature:** Added Marketing & UTM Campaign Dashboard.
