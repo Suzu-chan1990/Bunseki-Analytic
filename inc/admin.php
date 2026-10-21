@@ -202,6 +202,21 @@ function bunseki_render_page() {
     $mins = floor((float)$avg_duration / 60);
     $secs = (int)round((float)$avg_duration) % 60;
     $time_str = $mins . 'm ' . $secs . 's';
+
+    // Tracking health (cached for 60 s): last live hit, live views and bot hits in the last 24 h
+    $health = get_transient( 'bunseki_health' );
+    if ( false === $health ) {
+        $tbl_h    = $wpdb->prefix . 'bunseki_log';
+        $since_h  = gmdate( 'Y-m-d H:i:s', time() - DAY_IN_SECONDS );
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $row_h    = $wpdb->get_row( $wpdb->prepare( "SELECT MAX(time) AS last_live, COUNT(*) AS cnt FROM $tbl_h WHERE time > %s AND width > 0", $since_h ) );
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $last_bot = $wpdb->get_var( "SELECT MAX(last_seen) FROM {$wpdb->prefix}bunseki_bots" );
+        $health   = [ 'last_live' => $row_h ? $row_h->last_live : null, 'cnt' => $row_h ? (int) $row_h->cnt : 0, 'last_bot' => $last_bot ];
+        set_transient( 'bunseki_health', $health, 60 );
+    }
+    $live_ts   = $health['last_live'] ? strtotime( $health['last_live'] . ' UTC' ) : 0;
+    $health_ok = ( $live_ts && ( time() - $live_ts ) < 3 * HOUR_IN_SECONDS );
     ?>
     <div class="bun-wrap">
         <div class="bun-header">
@@ -222,6 +237,35 @@ function bunseki_render_page() {
                 <div class="bun-live <?php echo ($live > 0) ? 'active' : ''; ?>"><span class="dot"></span> <?php echo esc_html($live); ?> <?php esc_html_e('Live', 'bunseki-analytic'); ?></div>
             </div>
         </div>
+
+        <div class="bun-card" style="margin-bottom:25px; border-left: 4px solid <?php echo $health_ok ? '#10b981' : '#ef4444'; ?>;">
+            <h3 style="margin-bottom:10px;"><span>🩺 <?php esc_html_e('Tracking Health', 'bunseki-analytic'); ?></span></h3>
+            <div style="display:flex; gap:30px; flex-wrap:wrap; align-items:center; font-size:14px;">
+                <div>
+                    <strong><?php echo $health_ok ? '✅ ' . esc_html__('Live tracking active', 'bunseki-analytic') : '❌ ' . esc_html__('No live hits in the last 3 hours - check the endpoint, caching and firewall rules', 'bunseki-analytic'); ?></strong><br>
+                    <span style="color:#64748b;">
+                        <?php echo $live_ts ? esc_html( sprintf( /* translators: %s: time difference */ __('Last live hit: %s ago', 'bunseki-analytic'), human_time_diff( $live_ts, time() ) ) ) : esc_html__('Last live hit: none in the last 24 h', 'bunseki-analytic'); ?>
+                        &nbsp;|&nbsp; <?php echo esc_html( number_format( $health['cnt'] ) ); ?> <?php esc_html_e('live views (24 h)', 'bunseki-analytic'); ?>
+                        &nbsp;|&nbsp; <?php echo $health['last_bot'] ? esc_html( sprintf( /* translators: %s: time difference */ __('Last bot hit: %s ago', 'bunseki-analytic'), human_time_diff( strtotime( $health['last_bot'] . ' UTC' ), time() ) ) ) : esc_html__('No bot hits yet', 'bunseki-analytic'); ?>
+                    </span>
+                </div>
+                <div>
+                    <button type="button" class="button" id="bun-selftest"><?php esc_html_e('Test endpoint', 'bunseki-analytic'); ?></button>
+                    <span id="bun-selftest-result" style="margin-left:10px; font-weight:600;"></span>
+                </div>
+            </div>
+        </div>
+        <script>
+        document.getElementById('bun-selftest').addEventListener('click', function () {
+            var out = document.getElementById('bun-selftest-result');
+            var fd = new FormData();
+            fd.append('selftest', '1');
+            out.textContent = '...';
+            fetch('<?php echo esc_url_raw( rest_url( 'bunseki/v1/track' ) ); ?>', { method: 'POST', body: fd })
+                .then(function (r) { out.textContent = (r.status === 204 ? '✅ OK (204)' : '❌ HTTP ' + r.status + (r.status === 404 ? ' - route not found' : '')); })
+                .catch(function () { out.textContent = '❌ <?php echo esc_js( __( 'Request failed', 'bunseki-analytic' ) ); ?>'; });
+        });
+        </script>
 
         <div class="bun-tabs-nav">
             <div class="bun-tab active" data-target="tab-overview">🏠 <?php esc_html_e('Overview', 'bunseki-analytic'); ?></div>
@@ -670,6 +714,8 @@ function bunseki_ajax_import_log() {
                 $key = $log_date . '|' . $bot_name . '|' . $url . '|' . $status;
                 if (!isset($batch_bots[$key])) $batch_bots[$key] = ['hits'=>0, 'date'=>$log_date, 'bot'=>$bot_name, 'url'=>$url, 'status'=>$status];
                 $batch_bots[$key]['hits']++;
+            } elseif ( ! Bunseki_Helper::is_countable_pageview( $req[0] ?? 'GET', (string) $path_only, $status, $log_date ) ) {
+                // Not a real human pageview (noise, non-GET, redirect) or day already covered by live tracking.
             } else {
                 // Menschlicher User -> Hash generieren (DSGVO konform)
                 $salt = defined('NONCE_SALT') ? NONCE_SALT : 'BUNSEKI_SECURE_SALT';
@@ -724,6 +770,6 @@ function bunseki_ajax_import_log() {
         }
     }
     
-    if ($is_done) { delete_transient('bunseki_dashboard_stats_v6'); }
+    if ($is_done) { bunseki_clear_dashboard_cache(); }
     wp_send_json_success(['offset' => $new_offset, 'done' => $is_done, 'parsed' => $parsed]);
 }

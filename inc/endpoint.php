@@ -4,19 +4,22 @@
  *
  * Registriert den REST-Route bunseki/v1/track.
  * Wird über wp_enqueue_scripts in bunseki-analytic.php geladen.
- * WordPress ist zu diesem Zeitpunkt bereits vollständig initialisiert –
- * kein SHORTINIT, kein manuelles wp-load.php nötig.
+ * (PHP 8.5 Optimized & Nginx Error-Free)
  *
  * @package Bunseki_Analytic
- * @since   1.2.0
+ * @since   1.2.1
  */
 
-if ( ! defined( 'ABSPATH' ) ) exit;
+declare(strict_types=1);
+
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
 
 // ========================================================================
 // REST Route registrieren
 // ========================================================================
-add_action( 'rest_api_init', function () {
+add_action( 'rest_api_init', function (): void {
     register_rest_route( 'bunseki/v1', '/track', [
         'methods'             => 'POST',
         'callback'            => 'bunseki_rest_track_handler',
@@ -28,7 +31,7 @@ add_action( 'rest_api_init', function () {
  * Verarbeitet einen eingehenden Tracking-Request.
  *
  * @param WP_REST_Request $request Der eingehende Request.
- * @return WP_REST_Response
+ * @return WP_REST_Response|void
  */
 function bunseki_rest_track_handler( WP_REST_Request $request ) {
     global $wpdb;
@@ -44,22 +47,28 @@ function bunseki_rest_track_handler( WP_REST_Request $request ) {
     // ----------------------------------------------------------------
     // 2. Reale IP ermitteln
     // ----------------------------------------------------------------
-    $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    $ip     = Bunseki_Helper::get_client_ip();
+    $ua_raw = (string) ( $_SERVER['HTTP_USER_AGENT'] ?? '' );
+
+    // Self-test from the dashboard: answer immediately, store nothing.
+    if ( (string) $request->get_param( 'selftest' ) === '1' ) {
+        return new WP_REST_Response( null, 204 );
+    }
+
+    // Occasional cleanup of old rate-limit / dedupe temp files.
+    if ( mt_rand( 1, 200 ) === 1 ) {
+        bunseki_gc_temp_files();
+    }
 
     // ----------------------------------------------------------------
-    // 3. CORS Origin-Check (FIX: unterstützt jetzt Subdomains korrekt)
-    //
-    //    Beispiel: Anfrage kommt von ai.vtubes.tokyo, $host ist ai.vtubes.tokyo
-    //    -> Origin-Host muss mit $host ODER einer seiner Parent-Domains matchen.
-    //    Kein Origin-Header (z.B. sendBeacon) wird immer durchgelassen.
+    // 3. CORS Origin-Check
     // ----------------------------------------------------------------
-    $host   = $_SERVER['HTTP_HOST'] ?? '';
-    $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+    $host   = (string) ( $_SERVER['HTTP_HOST'] ?? '' );
+    $origin = (string) ( $_SERVER['HTTP_ORIGIN'] ?? '' );
 
-    if ( ! empty( $origin ) ) {
+    if ( $origin !== '' ) {
         $origin_host = (string) parse_url( $origin, PHP_URL_HOST );
 
-        // Extrahiere die zwei letzten Domain-Segmente (z.B. "vtubes.tokyo")
         $host_parts        = explode( '.', $host );
         $origin_host_parts = explode( '.', $origin_host );
         $base_host         = implode( '.', array_slice( $host_parts, -2 ) );
@@ -73,19 +82,18 @@ function bunseki_rest_track_handler( WP_REST_Request $request ) {
     // ----------------------------------------------------------------
     // 4. File-basiertes Rate-Limiting: max. 120 Hits / 60s pro IP
     // ----------------------------------------------------------------
-    $rl_file  = rtrim( sys_get_temp_dir(), DIRECTORY_SEPARATOR ) . DIRECTORY_SEPARATOR . 'bunseki_rl_' . md5( $ip );
+    $rl_file  = rtrim( sys_get_temp_dir(), DIRECTORY_SEPARATOR ) . DIRECTORY_SEPARATOR . 'bunseki_rl_' . md5( $ip . '|' . $ua_raw );
     $now      = time();
     $window   = 60;
     $max_hits = 120;
     $hits     = 0;
     $start_ts = $now;
 
-    // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
     $fh = @fopen( $rl_file, 'c+' );
     if ( $fh ) {
         @flock( $fh, LOCK_EX );
         $data = trim( (string) stream_get_contents( $fh ) );
-        if ( $data ) {
+        if ( $data !== '' ) {
             $parts = explode( ',', $data, 2 );
             if ( count( $parts ) === 2 ) {
                 $start_ts = (int) $parts[0];
@@ -101,7 +109,6 @@ function bunseki_rest_track_handler( WP_REST_Request $request ) {
         rewind( $fh );
         fwrite( $fh, $start_ts . ',' . $hits );
         @flock( $fh, LOCK_UN );
-        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
         fclose( $fh );
     }
 
@@ -112,24 +119,24 @@ function bunseki_rest_track_handler( WP_REST_Request $request ) {
     // ----------------------------------------------------------------
     // 5. DNT & Opt-Out Cookie prüfen
     // ----------------------------------------------------------------
-    $dnt = $_SERVER['HTTP_DNT'] ?? '0';
+    $dnt = (string) ( $_SERVER['HTTP_DNT'] ?? '0' );
     if ( $dnt === '1' ) {
-        return new WP_REST_Response( 'ok', 200 );
+        return new WP_REST_Response( null, 204 );
     }
     if ( isset( $_COOKIE['bunseki_dnt'] ) && $_COOKIE['bunseki_dnt'] === '1' ) {
-        return new WP_REST_Response( 'ok', 200 );
+        return new WP_REST_Response( null, 204 );
     }
 
     // ----------------------------------------------------------------
-    // 6. Input bereinigen (aus Request-Params, sauber via WP REST API)
+    // 6. Input bereinigen
     // ----------------------------------------------------------------
-    $url       = $request->get_param( 'url' )        ?? '/';
+    $url       = (string) ( $request->get_param( 'url' ) ?? '/' );
     $url       = substr( strip_tags( $url ), 0, 255 );
     $url       = (string) preg_replace( '/[?#].*/', '', $url );
     $url       = rtrim( (string) preg_replace( '#/+#', '/', $url ), '/' );
-    if ( empty( $url ) ) $url = '/';
+    if ( $url === '' ) $url = '/';
 
-    $lang = $request->get_param( 'lang' ) ?? 'ja';
+    $lang = (string) ( $request->get_param( 'lang' ) ?? 'ja' );
     $lang = substr( strip_tags( $lang ), 0, 2 );
     if ( ! preg_match( '/^[a-z]{2}$/', $lang ) ) $lang = 'ja';
 
@@ -143,18 +150,57 @@ function bunseki_rest_track_handler( WP_REST_Request $request ) {
     $event_name = substr( strip_tags( (string) ( $request->get_param( 'event_name' ) ?? '' ) ), 0, 100 );
     $event_val  = substr( strip_tags( (string) ( $request->get_param( 'event_val' )  ?? '' ) ), 0, 255 );
 
+    // Search term + "found results" flag (the tracker sends 'search' and 'found')
+    $search_term    = substr( strip_tags( (string) ( $request->get_param( 'search' ) ?? '' ) ), 0, 100 );
+    $search_results = ( $search_term !== '' && (string) $request->get_param( 'found' ) === '0' ) ? 0 : 1;
+
+    // Referrer -> domain ('Direct', 'Internal' or external host)
+    $referrer_raw = trim( (string) ( $request->get_param( 'referrer' ) ?? '' ) );
+    $referrer     = '';
+    $ref_domain   = 'Direct';
+    if ( $referrer_raw !== '' ) {
+        $ref_host = (string) preg_replace( '/^www\./', '', strtolower( (string) parse_url( $referrer_raw, PHP_URL_HOST ) ) );
+        if ( $ref_host !== '' ) {
+            $ref_base = implode( '.', array_slice( explode( '.', $ref_host ), -2 ) );
+            if ( $ref_base === implode( '.', array_slice( explode( '.', $host ), -2 ) ) ) {
+                $ref_domain = 'Internal';
+            } else {
+                $ref_domain = substr( $ref_host, 0, 100 );
+                $referrer   = substr( esc_url_raw( (string) strtok( $referrer_raw, '?#' ) ), 0, 255 );
+            }
+        }
+    }
+
+    // ================================================================
+    // 🚀 THE MAGIC TRICK: FASTCGI FINISH REQUEST
+    // ================================================================
+    // Sende HTTP 204 No Content Header sofort raus.
+    status_header( 204 );
+    header( 'Connection: close' );
+
+    // Sag Nginx: "Alles okay, du kannst die Verbindung zum Browser schließen!"
+    // Der Browser ist glücklich, Nginx wirft keine "recv() failed" Errors mehr,
+    // und PHP schreibt die Daten im Anschluss in Ruhe in die Datenbank.
+    if ( function_exists( 'fastcgi_finish_request' ) ) {
+        fastcgi_finish_request();
+    }
+
     // ----------------------------------------------------------------
     // 7. Dedupe-Guard: verhindert DB-Spam (30s Fenster pro IP+URL)
-    //    Heartbeat-Updates (is_update=1) werden immer durchgelassen.
     // ----------------------------------------------------------------
-    $dedupe_key  = md5( $ip . '|' . $url );
-    $dedupe_file = sys_get_temp_dir() . '/bunseki_dedupe_' . $dedupe_key;
-
-    if ( ! $is_update ) {
-        if ( file_exists( $dedupe_file ) && ( time() - filemtime( $dedupe_file ) ) < 30 ) {
-            return new WP_REST_Response( 'ok', 204 );
+    // Bots that execute JS: count them as bots, not as humans
+    $bot = Bunseki_Helper::detect_bot( $ua_raw );
+    if ( $bot ) {
+        if ( $is_update === 0 && $event_name === '' ) {
+            bunseki_insert_bot_hit( $bot, $url, $status );
         }
-        @touch( $dedupe_file );
+        exit;
+    }
+
+    // Key includes the user agent so visitors behind one IP (mobile, campus) do not hide each other.
+    // Custom events are never deduplicated (several clicks on one page are legitimate).
+    if ( $is_update === 0 && $event_name === '' && bunseki_seen_recently( md5( $ip . '|' . $ua_raw . '|' . $url ), 30 ) ) {
+        exit;
     }
 
     // ----------------------------------------------------------------
@@ -177,7 +223,7 @@ function bunseki_rest_track_handler( WP_REST_Request $request ) {
     $device = ( $width < 900 || $os === 'Android' || $os === 'iOS' ) ? 'Mobile' : 'Desktop';
 
     // ----------------------------------------------------------------
-    // 9. Datenschutzkonformes Hashing (täglich rotierendes Salt)
+    // 9. Datenschutzkonformes Hashing
     // ----------------------------------------------------------------
     $salt = defined( 'NONCE_SALT' ) ? NONCE_SALT : 'BUNSEKI_SECURE_SALT';
     $hash = md5( $ip . $ua . gmdate( 'Y-m-d' ) . $salt );
@@ -185,9 +231,8 @@ function bunseki_rest_track_handler( WP_REST_Request $request ) {
     // ----------------------------------------------------------------
     // 10. Custom Events
     // ----------------------------------------------------------------
-    if ( ! empty( $event_name ) ) {
+    if ( $event_name !== '' ) {
         $tbl_evt = $wpdb->prefix . 'bunseki_events';
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
         $wpdb->insert( $tbl_evt, [
             'time'       => gmdate( 'Y-m-d H:i:s' ),
             'event_name' => $event_name,
@@ -195,7 +240,7 @@ function bunseki_rest_track_handler( WP_REST_Request $request ) {
             'url'        => $url,
             'hash'       => $hash,
         ] );
-        return new WP_REST_Response( '1', 200 );
+        exit; // DB-Arbeit fertig, wir steigen leise aus
     }
 
     // ----------------------------------------------------------------
@@ -203,23 +248,21 @@ function bunseki_rest_track_handler( WP_REST_Request $request ) {
     // ----------------------------------------------------------------
     $table = $wpdb->prefix . 'bunseki_log';
 
-    if ( $is_update ) {
+    if ( $is_update !== 0 ) {
         // Heartbeat: nur Verweildauer updaten
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
         $wpdb->query(
             $wpdb->prepare(
-                "UPDATE $table SET duration = %d WHERE hash = %s AND url = %s ORDER BY id DESC LIMIT 1",
-                $duration, $hash, $url
+                "UPDATE {$table} SET duration = %d, load_time = IF( %d > 0, %d, load_time ) WHERE hash = %s AND url = %s ORDER BY id DESC LIMIT 1",
+                $duration, $load, $load, $hash, $url
             )
         );
     } else {
         // Neuer Seitenaufruf
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
         $wpdb->insert( $table, [
             'time'           => gmdate( 'Y-m-d H:i:s' ),
             'url'            => $url,
-            'referrer'       => '',
-            'ref_domain'     => 'Direct',
+            'referrer'       => $referrer,
+            'ref_domain'     => $ref_domain,
             'utm_source'     => $utm,
             'hash'           => $hash,
             'device'         => $device,
@@ -231,10 +274,43 @@ function bunseki_rest_track_handler( WP_REST_Request $request ) {
             'ttfb'           => $ttfb,
             'status'         => $status,
             'duration'       => $duration,
-            'search_term'    => '',
-            'search_results' => 1,
+            'search_term'    => $search_term,
+            'search_results' => $search_results,
         ] );
     }
 
-    return new WP_REST_Response( '1', 200 );
+    // Wir steigen per exit aus, damit WordPress nicht versucht, 
+    // nach dem fastcgi_finish_request() noch einmal Header zu generieren.
+    exit;
+}
+
+/**
+ * Returns true if the key was seen within $ttl seconds (and marks it as seen otherwise).
+ * Uses the object cache when a persistent one exists, temp files otherwise.
+ */
+function bunseki_seen_recently( string $key, int $ttl ): bool {
+    if ( wp_using_ext_object_cache() ) {
+        // wp_cache_add() fails if the key already exists -> already seen.
+        return ! wp_cache_add( 'dd_' . $key, 1, 'bunseki', $ttl );
+    }
+    $file = rtrim( sys_get_temp_dir(), DIRECTORY_SEPARATOR ) . DIRECTORY_SEPARATOR . 'bunseki_dedupe_' . $key;
+    if ( file_exists( $file ) && ( time() - (int) @filemtime( $file ) ) < $ttl ) {
+        return true;
+    }
+    @touch( $file );
+    return false;
+}
+
+/**
+ * Deletes rate-limit and dedupe temp files older than 5 minutes.
+ */
+function bunseki_gc_temp_files(): void {
+    $files = glob( rtrim( sys_get_temp_dir(), DIRECTORY_SEPARATOR ) . DIRECTORY_SEPARATOR . 'bunseki_*' );
+    if ( ! $files ) return;
+    $limit = time() - 300;
+    foreach ( $files as $f ) {
+        if ( is_file( $f ) && (int) @filemtime( $f ) < $limit ) {
+            @unlink( $f );
+        }
+    }
 }

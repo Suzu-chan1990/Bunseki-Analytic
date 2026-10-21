@@ -11,7 +11,7 @@
  * @since 1.2.0
  */
 
-window.addEventListener( 'load', function () {
+( function () {
 
     // ----------------------------------------------------------------
     // 0. DNT & Opt-Out-Cookie: sofort beenden wenn aktiv
@@ -61,10 +61,20 @@ window.addEventListener( 'load', function () {
     var ttfb = 0;
     var load = 0;
     var perf = window.performance || {};
-    if ( perf.timing ) {
-        ttfb = perf.timing.responseStart           - perf.timing.navigationStart;
-        load = perf.timing.domContentLoadedEventEnd - perf.timing.navigationStart;
+
+    // Re-read on every send: DOMContentLoaded may not be finished at the first beacon.
+    function readPerf() {
+        var nav = ( perf.getEntriesByType && perf.getEntriesByType( 'navigation' )[ 0 ] ) || null;
+        if ( nav ) {
+            ttfb = Math.max( 0, Math.round( nav.responseStart ) );
+            load = nav.domContentLoadedEventEnd > 0 ? Math.round( nav.domContentLoadedEventEnd ) : 0;
+        } else if ( perf.timing ) {
+            ttfb = Math.max( 0, perf.timing.responseStart - perf.timing.navigationStart );
+            load = perf.timing.domContentLoadedEventEnd > 0
+                ? perf.timing.domContentLoadedEventEnd - perf.timing.navigationStart : 0;
+        }
     }
+    readPerf();
 
     // ----------------------------------------------------------------
     // 4. URL-Parameter (UTM & Suche)
@@ -74,7 +84,7 @@ window.addEventListener( 'load', function () {
     var search_count = 1;
     if (
         search_term &&
-        ( document.body.classList.contains( 'no-results' ) ||
+        ( ( document.body && document.body.classList.contains( 'no-results' ) ) ||
           document.querySelector( '.no-results' ) )
     ) {
         search_count = 0;
@@ -106,6 +116,10 @@ window.addEventListener( 'load', function () {
     function send( is_final ) {
         var endpoint = getEndpoint();
         if ( ! endpoint ) return;
+
+        readPerf();
+        data.ttfb = ttfb;
+        data.load = load;
 
         if ( is_final ) {
             data.duration  = Math.round( active_time / 1000 );
@@ -200,4 +214,15 @@ window.addEventListener( 'load', function () {
         send( true );
     } );
 
-} );
+    // Page restored from the back/forward cache: count it as a new view.
+    window.addEventListener( 'pageshow', function ( e ) {
+        if ( e.persisted ) {
+            active_time   = 0;
+            last_time     = Date.now();
+            last_activity = Date.now();
+            data.duration = 0;
+            send( false );
+        }
+    } );
+
+} )();

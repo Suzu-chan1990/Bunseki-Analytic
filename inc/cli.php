@@ -112,6 +112,8 @@ class Bunseki_CLI {
                             ];
                         }
                         $batch_bots[ $key ]['hits']++;
+                    } elseif ( ! Bunseki_Helper::is_countable_pageview( $req[0] ?? 'GET', $path_only, $status, $log_date ) ) {
+                        // Not a real human pageview (noise, non-GET, redirect) or day already covered by live tracking.
                     } else {
                         $salt   = defined( 'NONCE_SALT' ) ? NONCE_SALT : 'BUNSEKI_SECURE_SALT';
                         $hash   = md5( $ip . $ua . $log_date . $salt );
@@ -161,7 +163,7 @@ class Bunseki_CLI {
             ) );
         }
 
-        delete_transient( 'bunseki_dashboard_stats_v3' );
+        bunseki_clear_dashboard_cache();
         WP_CLI::success( __( '✅ All provided files successfully processed! Cache cleared.', 'bunseki-analytic' ) );
     }
 
@@ -224,7 +226,7 @@ class Bunseki_CLI {
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
         $wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE 'bunseki_log_offset_%'" );
 
-        delete_transient( 'bunseki_dashboard_stats_v3' );
+        bunseki_clear_dashboard_cache();
 
         WP_CLI::success( __( '✅ Bunseki database & cache completely cleared! System ready for fresh import.', 'bunseki-analytic' ) );
     }

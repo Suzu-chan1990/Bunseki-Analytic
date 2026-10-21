@@ -57,7 +57,8 @@ function bunseki_install_db() {
         search_results int(1) DEFAULT 1 NOT NULL,
         PRIMARY KEY  (id),
         KEY time (time),
-        KEY url (url)
+        KEY url (url),
+        KEY hash_url (hash,url)
     ) $charset_collate;";
 
     // Custom Events Tabelle

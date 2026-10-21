@@ -69,6 +69,102 @@ class Bunseki_Helper {
 
         return false;
     }
+
+    /**
+     * Returns the real client IP.
+     * Proxy headers are only trusted if the direct peer is a private/reserved address
+     * (local nginx/proxy) or BUNSEKI_TRUST_PROXY_HEADERS is defined as true.
+     *
+     * @return string
+     */
+    public static function get_client_ip(): string {
+        $remote = (string) ( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' );
+        $trusted = ( defined( 'BUNSEKI_TRUST_PROXY_HEADERS' ) && BUNSEKI_TRUST_PROXY_HEADERS )
+            || ! filter_var( $remote, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE );
+
+        if ( $trusted ) {
+            foreach ( [ 'HTTP_CF_CONNECTING_IP', 'HTTP_X_REAL_IP', 'HTTP_X_FORWARDED_FOR' ] as $h ) {
+                if ( empty( $_SERVER[ $h ] ) ) continue;
+                $candidate = trim( explode( ',', (string) $_SERVER[ $h ] )[0] );
+                if ( filter_var( $candidate, FILTER_VALIDATE_IP ) ) return $candidate;
+            }
+        }
+        return $remote;
+    }
+
+    /**
+     * True for URLs that are never real pageviews (API, cron, feeds, etc.).
+     */
+    public static function is_noise_path( string $path ): bool {
+        return (bool) preg_match(
+            '#^/(wp-json|wp-admin|wp-login\.php|wp-cron\.php|xmlrpc\.php|robots\.txt|favicon|\.well-known|feed)|admin-ajax\.php|/feed/?$|sitemap[^/]*\.xml$#i',
+            $path
+        );
+    }
+
+    /**
+     * True if a day already has live-tracked rows (width > 0).
+     * Log imports skip human rows for such days to avoid double counting.
+     */
+    public static function day_has_live_data( string $date ): bool {
+        static $cache = [];
+        if ( isset( $cache[ $date ] ) ) return $cache[ $date ];
+
+        global $wpdb;
+        $tbl = $wpdb->prefix . 'bunseki_log';
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $found = $wpdb->get_var( $wpdb->prepare(
+            "SELECT 1 FROM $tbl WHERE time >= %s AND time < DATE_ADD(%s, INTERVAL 1 DAY) AND width > 0 LIMIT 1",
+            $date . ' 00:00:00', $date . ' 00:00:00'
+        ) );
+        return $cache[ $date ] = ( $found !== null );
+    }
+
+    /**
+     * Decides whether a (non-bot) log line counts as a human pageview.
+     */
+    public static function is_countable_pageview( string $method, string $path, int $status, string $log_date ): bool {
+        if ( strtoupper( $method ) !== 'GET' ) return false;
+        if ( ! in_array( $status, [ 200, 404 ], true ) ) return false;
+        if ( self::is_noise_path( $path ) ) return false;
+        if ( self::day_has_live_data( $log_date ) ) return false;
+        return true;
+    }
+}
+
+/**
+ * Records one bot hit (aggregated per day/bot/url/status).
+ * Used by the firewall (403) and the tracking endpoint (JS-executing bots).
+ */
+function bunseki_insert_bot_hit( $bot_name, $url = null, $status = 403 ) {
+    global $wpdb;
+
+    if ( null === $url ) {
+        // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized, WordPress.Security.ValidatedSanitizedInput.MissingUnslash
+        $url = (string) ( $_SERVER['REQUEST_URI'] ?? '/' );
+    }
+    $url = substr( (string) preg_replace( '/[?#].*/', '', (string) $url ), 0, 255 );
+    if ( $url === '' ) $url = '/';
+
+    $tbl = $wpdb->prefix . 'bunseki_bots';
+    $now = gmdate( 'Y-m-d H:i:s' );
+
+    // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+    $wpdb->query( $wpdb->prepare(
+        "INSERT INTO $tbl (date, bot_name, url, hits, status, last_seen)
+         VALUES (%s, %s, %s, 1, %d, %s)
+         ON DUPLICATE KEY UPDATE hits = hits + 1, last_seen = %s",
+        gmdate( 'Y-m-d' ), substr( (string) $bot_name, 0, 50 ), $url, (int) $status, $now, $now
+    ) );
+}
+
+/**
+ * Deletes all dashboard caches (one transient per range).
+ */
+function bunseki_clear_dashboard_cache() {
+    foreach ( [ '30', '60', '90', '120', 'all' ] as $r ) {
+        delete_transient( 'bunseki_dashboard_stats_v7_' . $r );
+    }
 }
 
 /**

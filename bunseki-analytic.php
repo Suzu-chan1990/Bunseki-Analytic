@@ -2,23 +2,24 @@
 /**
  * Plugin Name: Bunseki Analytic
  * Description: High Scale Analytics (Stealth & Secure).
- * Version: 1.2.0
+ * Version: 1.2.2
  * Author: Saguya
  * License: GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * Requires at least: 6.0
- * Tested up to: 7.0
- * Requires PHP: 8.1
+ * Requires at least: 7.0
+ * Tested up to: 7.1
+ * Requires PHP: 8.4
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'BUNSEKI_VERSION', '1.2.0' );
+define( 'BUNSEKI_VERSION', '1.2.2' );
 define( 'BUNSEKI_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BUNSEKI_URL', plugin_dir_url( __FILE__ ) );
 
 require_once BUNSEKI_PATH . 'inc/install.php';
 require_once BUNSEKI_PATH . 'inc/common.php';
+require_once BUNSEKI_PATH . 'inc/endpoint.php'; // REST tracking route (was never loaded before)
 
 if ( is_admin() ) {
     require_once BUNSEKI_PATH . 'inc/admin.php';
@@ -64,49 +65,11 @@ function bunseki_firewall_check() {
 }
 
 // ========================================================================
-// 📡 Live Bot Tracker (shutdown hook für alle nicht-geblockten Bots)
+// 📡 Live Bot Tracker
 // ========================================================================
-add_action( 'shutdown', 'bunseki_live_bot_tracker' );
-function bunseki_live_bot_tracker() {
-    if ( defined( 'DOING_CRON' ) && DOING_CRON ) return;
-    if ( defined( 'WP_CLI' ) && WP_CLI ) return;
-
-    // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized, WordPress.Security.ValidatedSanitizedInput.MissingUnslash
-    $ua = isset( $_SERVER['HTTP_USER_AGENT'] ) ? $_SERVER['HTTP_USER_AGENT'] : '';
-    if ( empty( $ua ) ) return;
-
-    $bot_name = Bunseki_Helper::detect_bot( $ua );
-    if ( $bot_name ) {
-        bunseki_insert_bot_hit( $bot_name );
-    }
-}
-
-/**
- * Zentraler Bot-Insert (wird von Firewall & Live-Tracker genutzt).
- * FIX: detect_bot() wird jetzt nur noch einmal pro Request aufgerufen.
- *
- * @param string $bot_name Erkannter Bot-Name aus Bunseki_Helper::detect_bot().
- */
-function bunseki_insert_bot_hit( $bot_name ) {
-    global $wpdb;
-    $tbl_bot = $wpdb->prefix . 'bunseki_bots';
-    $url     = isset( $_SERVER['REQUEST_URI'] )
-        ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) )
-        : '/';
-    $date    = gmdate( 'Y-m-d' );
-    $now     = current_time( 'mysql' );
-    $status  = http_response_code() ?: 200;
-
-    // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-    $wpdb->query(
-        $wpdb->prepare(
-            "INSERT INTO $tbl_bot (date, bot_name, url, hits, status, last_seen)
-             VALUES (%s, %s, %s, %d, %d, %s)
-             ON DUPLICATE KEY UPDATE hits = hits + 1, last_seen = %s",
-            $date, $bot_name, $url, 1, $status, $now, $now
-        )
-    );
-}
+// Intentionally not attached to the shutdown hook. A DB write on every
+// frontend request adds avoidable latency on high-traffic installations.
+// Bots that are actually blocked by the firewall are still recorded.
 
 // ========================================================================
 // 📦 Frontend: Tracker-Script einbinden
