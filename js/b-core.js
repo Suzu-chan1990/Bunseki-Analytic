@@ -1,12 +1,9 @@
 /**
  * Bunseki Analytic – Frontend Tracker
  *
- * Fixes gegenüber v1.1.2:
- *  - endpoint-Variable war im bunseki.track()-Closure undefined (Scope-Bug).
- *    Jetzt wird window.bunsekiAjax.rest_url direkt beim Aufruf gelesen.
- *  - Heartbeat-Interval von 10s auf 30s erhöht (weniger DB-Last).
- *  - DoNotTrack-Check am Anfang zusammengefasst (DRY).
- *  - sendBeacon-Fallback sauber mit XHR implementiert.
+ * Sends one beacon per pageview, a heartbeat every 30 s and a final ping on
+ * page hide. Respects Do Not Track and the bunseki_dnt opt-out cookie.
+ * Public API: bunseki.track( name, value ) for custom events.
  *
  * @since 1.2.0
  */
@@ -14,7 +11,7 @@
 ( function () {
 
     // ----------------------------------------------------------------
-    // 0. DNT & Opt-Out-Cookie: sofort beenden wenn aktiv
+    // 0. DNT & opt-out cookie: stop immediately if set
     // ----------------------------------------------------------------
     if (
         navigator.doNotTrack === '1' ||
@@ -23,9 +20,8 @@
     ) return;
 
     // ----------------------------------------------------------------
-    // 1. Endpunkt aus wp_localize_script-Objekt lesen
-    //    FIX: Wird jetzt erst beim tatsächlichen Aufruf von send()
-    //    ausgelesen, nicht bei Funktionsdefinition – kein Scope-Problem.
+    // 1. Endpoint from the wp_localize_script object
+    //    (read at send time, not at definition time)
     // ----------------------------------------------------------------
     function getEndpoint() {
         return ( window.bunsekiAjax && window.bunsekiAjax.rest_url )
@@ -34,7 +30,7 @@
     }
 
     // ----------------------------------------------------------------
-    // 2. Aktive Zeit messen (nur echte Nutzeraktivität)
+    // 2. Measure active time (real user activity only)
     // ----------------------------------------------------------------
     var active_time   = 0;
     var last_time     = Date.now();
@@ -48,7 +44,7 @@
 
     setInterval( function () {
         var now = Date.now();
-        // Nur zählen wenn innerhalb der letzten 30s Aktivität war
+        // Only count time if there was activity within the last 30 s
         if ( now - last_activity < 30000 ) {
             active_time += ( now - last_time );
         }
@@ -56,7 +52,7 @@
     }, 1000 );
 
     // ----------------------------------------------------------------
-    // 3. Performance-Metriken (TTFB & Load-Time)
+    // 3. Performance metrics (TTFB & load time)
     // ----------------------------------------------------------------
     var ttfb = 0;
     var load = 0;
@@ -77,7 +73,7 @@
     readPerf();
 
     // ----------------------------------------------------------------
-    // 4. URL-Parameter (UTM & Suche)
+    // 4. URL parameters (UTM & search)
     // ----------------------------------------------------------------
     var params       = new URLSearchParams( window.location.search );
     var search_term  = params.get( 's' ) || '';
@@ -91,7 +87,7 @@
     }
 
     // ----------------------------------------------------------------
-    // 5. Initiale Nutzlast zusammenstellen
+    // 5. Build the initial payload
     // ----------------------------------------------------------------
     var config = window.bunseki_config || {};
 
@@ -99,6 +95,7 @@
         url      : window.location.pathname,
         referrer : document.referrer,
         width    : window.innerWidth,
+        touch    : navigator.maxTouchPoints || 0,
         lang     : ( navigator.language || 'ja' ).slice( 0, 2 ).toLowerCase(),
         ttfb     : ttfb,
         load     : load,
@@ -111,7 +108,7 @@
     };
 
     // ----------------------------------------------------------------
-    // 6. Sende-Funktion (sendBeacon mit XHR-Fallback)
+    // 6. Send function (sendBeacon with XHR fallback)
     // ----------------------------------------------------------------
     function send( is_final ) {
         var endpoint = getEndpoint();
@@ -136,7 +133,7 @@
         if ( navigator.sendBeacon ) {
             navigator.sendBeacon( endpoint, fd );
         } else {
-            // Fallback für ältere Browser
+            // Fallback for older browsers
             var xhr = new XMLHttpRequest();
             xhr.open( 'POST', endpoint, true );
             var parts = [];
@@ -151,8 +148,7 @@
     }
 
     // ----------------------------------------------------------------
-    // 7. Public Event Tracker API: bunseki.track('Name', 'Wert')
-    //    FIX: endpoint wird jetzt via getEndpoint() zur Laufzeit gelesen.
+    // 7. Public event tracker API: bunseki.track('Name', 'Value')
     // ----------------------------------------------------------------
     window.bunseki          = window.bunseki || {};
     window.bunseki.track    = function ( name, value ) {
@@ -176,7 +172,7 @@
     };
 
     // ----------------------------------------------------------------
-    // 8. Auto-Track: Outbound Links & Downloads
+    // 8. Auto-track: outbound links & downloads
     // ----------------------------------------------------------------
     document.addEventListener( 'click', function ( e ) {
         var el = e.target.closest( 'a' );
@@ -193,20 +189,18 @@
     } );
 
     // ----------------------------------------------------------------
-    // 9. Tracking-Aufrufe
-    //    FIX: Heartbeat von 10s auf 30s erhöht -> deutlich weniger
-    //    DB-UPDATE-Queries bei vielen gleichzeitigen Besuchern.
+    // 9. Tracking calls (30 s heartbeat keeps DB updates low under load)
     // ----------------------------------------------------------------
 
-    // a) Initialer Seitenaufruf
+    // a) Initial pageview
     send( false );
 
-    // b) Heartbeat alle 30 Sekunden (Verweildauer aktualisieren)
+    // b) Heartbeat every 30 seconds (updates time on page)
     setInterval( function () {
         send( true );
     }, 30000 );
 
-    // c) Finaler Ping beim Verlassen der Seite
+    // c) Final ping when the page is left
     document.addEventListener( 'visibilitychange', function () {
         if ( document.visibilityState === 'hidden' ) send( true );
     } );

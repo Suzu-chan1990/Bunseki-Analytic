@@ -2,8 +2,7 @@
 /**
  * Bunseki REST API Tracking Endpoint
  *
- * Registriert den REST-Route bunseki/v1/track.
- * Wird über wp_enqueue_scripts in bunseki-analytic.php geladen.
+ * Registers the REST route bunseki/v1/track (loaded from bunseki-analytic.php).
  * (PHP 8.5 Optimized & Nginx Error-Free)
  *
  * @package Bunseki_Analytic
@@ -17,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // ========================================================================
-// REST Route registrieren
+// Register REST route
 // ========================================================================
 add_action( 'rest_api_init', function (): void {
     register_rest_route( 'bunseki/v1', '/track', [
@@ -28,16 +27,16 @@ add_action( 'rest_api_init', function (): void {
 } );
 
 /**
- * Verarbeitet einen eingehenden Tracking-Request.
+ * Handles an incoming tracking request.
  *
- * @param WP_REST_Request $request Der eingehende Request.
+ * @param WP_REST_Request $request Incoming request.
  * @return WP_REST_Response|void
  */
 function bunseki_rest_track_handler( WP_REST_Request $request ) {
     global $wpdb;
 
     // ----------------------------------------------------------------
-    // 1. Payload-Limit (Schutz vor überdimensionierten Requests)
+    // 1. Payload limit (protects against oversized requests)
     // ----------------------------------------------------------------
     $content_length = (int) ( $_SERVER['CONTENT_LENGTH'] ?? 0 );
     if ( $content_length > 16384 ) {
@@ -45,7 +44,7 @@ function bunseki_rest_track_handler( WP_REST_Request $request ) {
     }
 
     // ----------------------------------------------------------------
-    // 2. Reale IP ermitteln
+    // 2. Determine the real client IP
     // ----------------------------------------------------------------
     $ip     = Bunseki_Helper::get_client_ip();
     $ua_raw = (string) ( $_SERVER['HTTP_USER_AGENT'] ?? '' );
@@ -67,12 +66,8 @@ function bunseki_rest_track_handler( WP_REST_Request $request ) {
     $origin = (string) ( $_SERVER['HTTP_ORIGIN'] ?? '' );
 
     if ( $origin !== '' ) {
-        $origin_host = (string) parse_url( $origin, PHP_URL_HOST );
-
-        $host_parts        = explode( '.', $host );
-        $origin_host_parts = explode( '.', $origin_host );
-        $base_host         = implode( '.', array_slice( $host_parts, -2 ) );
-        $base_origin       = implode( '.', array_slice( $origin_host_parts, -2 ) );
+        $base_origin = Bunseki_Helper::base_host( (string) wp_parse_url( $origin, PHP_URL_HOST ) );
+        $base_host   = Bunseki_Helper::base_host( $host );
 
         if ( $base_origin !== $base_host ) {
             return new WP_REST_Response( 'Forbidden', 403 );
@@ -80,7 +75,7 @@ function bunseki_rest_track_handler( WP_REST_Request $request ) {
     }
 
     // ----------------------------------------------------------------
-    // 4. File-basiertes Rate-Limiting: max. 120 Hits / 60s pro IP
+    // 4. File-based rate limiting: max. 120 hits / 60 s per IP + user agent
     // ----------------------------------------------------------------
     $rl_file  = rtrim( sys_get_temp_dir(), DIRECTORY_SEPARATOR ) . DIRECTORY_SEPARATOR . 'bunseki_rl_' . md5( $ip . '|' . $ua_raw );
     $now      = time();
@@ -117,7 +112,7 @@ function bunseki_rest_track_handler( WP_REST_Request $request ) {
     }
 
     // ----------------------------------------------------------------
-    // 5. DNT & Opt-Out Cookie prüfen
+    // 5. Respect DNT header and opt-out cookie
     // ----------------------------------------------------------------
     $dnt = (string) ( $_SERVER['HTTP_DNT'] ?? '0' );
     if ( $dnt === '1' ) {
@@ -128,65 +123,52 @@ function bunseki_rest_track_handler( WP_REST_Request $request ) {
     }
 
     // ----------------------------------------------------------------
-    // 6. Input bereinigen
+    // 6. Sanitize input (integers are clamped to their column ranges)
     // ----------------------------------------------------------------
-    $url       = (string) ( $request->get_param( 'url' ) ?? '/' );
-    $url       = substr( strip_tags( $url ), 0, 255 );
-    $url       = (string) preg_replace( '/[?#].*/', '', $url );
-    $url       = rtrim( (string) preg_replace( '#/+#', '/', $url ), '/' );
-    if ( $url === '' ) $url = '/';
+    $url = Bunseki_Helper::normalize_path( (string) ( $request->get_param( 'url' ) ?? '/' ) );
 
     $lang = (string) ( $request->get_param( 'lang' ) ?? 'ja' );
-    $lang = substr( strip_tags( $lang ), 0, 2 );
+    $lang = strtolower( substr( wp_strip_all_tags( $lang ), 0, 2 ) );
     if ( ! preg_match( '/^[a-z]{2}$/', $lang ) ) $lang = 'ja';
 
-    $width      = (int) ( $request->get_param( 'width' )      ?? 0 );
-    $ttfb       = (int) ( $request->get_param( 'ttfb' )       ?? 0 );
-    $load       = (int) ( $request->get_param( 'load' )       ?? 0 );
-    $status     = (int) ( $request->get_param( 'status' )     ?? 200 );
-    $duration   = (int) ( $request->get_param( 'duration' )   ?? 0 );
+    $clamp      = static fn( $v, int $max ): int => max( 0, min( $max, (int) $v ) );
+    $width      = $clamp( $request->get_param( 'width' ),    20000 );
+    $touch      = $clamp( $request->get_param( 'touch' ),    20 );
+    $ttfb       = $clamp( $request->get_param( 'ttfb' ),     99999 );
+    $load       = $clamp( $request->get_param( 'load' ),     99999 );
+    $duration   = $clamp( $request->get_param( 'duration' ), 86400 );
+    $status     = (int) ( $request->get_param( 'status' ) ?? 200 );
+    if ( $status < 100 || $status > 599 ) $status = 200;
     $is_update  = (int) ( $request->get_param( 'is_update' )  ?? 0 );
-    $utm        = substr( strip_tags( (string) ( $request->get_param( 'utm' )        ?? '' ) ), 0, 50 );
-    $event_name = substr( strip_tags( (string) ( $request->get_param( 'event_name' ) ?? '' ) ), 0, 100 );
-    $event_val  = substr( strip_tags( (string) ( $request->get_param( 'event_val' )  ?? '' ) ), 0, 255 );
+    $utm        = substr( wp_strip_all_tags( (string) ( $request->get_param( 'utm' )        ?? '' ) ), 0, 50 );
+    $event_name = substr( wp_strip_all_tags( (string) ( $request->get_param( 'event_name' ) ?? '' ) ), 0, 100 );
+    $event_val  = substr( wp_strip_all_tags( (string) ( $request->get_param( 'event_val' )  ?? '' ) ), 0, 255 );
 
     // Search term + "found results" flag (the tracker sends 'search' and 'found')
-    $search_term    = substr( strip_tags( (string) ( $request->get_param( 'search' ) ?? '' ) ), 0, 100 );
+    $search_term    = substr( wp_strip_all_tags( (string) ( $request->get_param( 'search' ) ?? '' ) ), 0, 100 );
     $search_results = ( $search_term !== '' && (string) $request->get_param( 'found' ) === '0' ) ? 0 : 1;
 
     // Referrer -> domain ('Direct', 'Internal' or external host)
-    $referrer_raw = trim( (string) ( $request->get_param( 'referrer' ) ?? '' ) );
-    $referrer     = '';
-    $ref_domain   = 'Direct';
-    if ( $referrer_raw !== '' ) {
-        $ref_host = (string) preg_replace( '/^www\./', '', strtolower( (string) parse_url( $referrer_raw, PHP_URL_HOST ) ) );
-        if ( $ref_host !== '' ) {
-            $ref_base = implode( '.', array_slice( explode( '.', $ref_host ), -2 ) );
-            if ( $ref_base === implode( '.', array_slice( explode( '.', $host ), -2 ) ) ) {
-                $ref_domain = 'Internal';
-            } else {
-                $ref_domain = substr( $ref_host, 0, 100 );
-                $referrer   = substr( esc_url_raw( (string) strtok( $referrer_raw, '?#' ) ), 0, 255 );
-            }
-        }
-    }
+    [ $referrer, $ref_domain ] = Bunseki_Helper::classify_referrer(
+        (string) ( $request->get_param( 'referrer' ) ?? '' ),
+        $host !== '' ? $host : Bunseki_Helper::site_host()
+    );
 
     // ================================================================
     // 🚀 THE MAGIC TRICK: FASTCGI FINISH REQUEST
     // ================================================================
-    // Sende HTTP 204 No Content Header sofort raus.
+    // Send the 204 No Content response immediately.
     status_header( 204 );
     header( 'Connection: close' );
 
-    // Sag Nginx: "Alles okay, du kannst die Verbindung zum Browser schließen!"
-    // Der Browser ist glücklich, Nginx wirft keine "recv() failed" Errors mehr,
-    // und PHP schreibt die Daten im Anschluss in Ruhe in die Datenbank.
+    // Let PHP-FPM close the connection to nginx/the browser now. The browser gets its answer
+    // instantly, nginx logs no "recv() failed" errors, and the DB write happens afterwards.
     if ( function_exists( 'fastcgi_finish_request' ) ) {
         fastcgi_finish_request();
     }
 
     // ----------------------------------------------------------------
-    // 7. Dedupe-Guard: verhindert DB-Spam (30s Fenster pro IP+URL)
+    // 7. Bot routing and dedupe guard (30 s window per IP + UA + URL)
     // ----------------------------------------------------------------
     // Bots that execute JS: count them as bots, not as humans
     $bot = Bunseki_Helper::detect_bot( $ua_raw );
@@ -204,29 +186,14 @@ function bunseki_rest_track_handler( WP_REST_Request $request ) {
     }
 
     // ----------------------------------------------------------------
-    // 8. User-Agent, Device, OS, Browser erkennen
+    // 8. Detect device, OS and browser
     // ----------------------------------------------------------------
-    $ua = (string) ( $_SERVER['HTTP_USER_AGENT'] ?? '' );
-
-    $os = 'Unknown';
-    if      ( stripos( $ua, 'windows' ) !== false ) $os = 'Windows';
-    elseif  ( stripos( $ua, 'android' ) !== false ) $os = 'Android';
-    elseif  ( stripos( $ua, 'iphone' )  !== false ) $os = 'iOS';
-    elseif  ( stripos( $ua, 'mac' )     !== false ) $os = 'macOS';
-    elseif  ( stripos( $ua, 'linux' )   !== false ) $os = 'Linux';
-
-    $browser = 'Unknown';
-    if      ( stripos( $ua, 'chrome' )  !== false ) $browser = 'Chrome';
-    elseif  ( stripos( $ua, 'firefox' ) !== false ) $browser = 'Firefox';
-    elseif  ( stripos( $ua, 'safari' )  !== false ) $browser = 'Safari';
-
-    $device = ( $width < 900 || $os === 'Android' || $os === 'iOS' ) ? 'Mobile' : 'Desktop';
+    $ua_info = Bunseki_Helper::parse_ua( $ua_raw, $width, $touch );
 
     // ----------------------------------------------------------------
-    // 9. Datenschutzkonformes Hashing
+    // 9. Privacy-friendly daily hash (rotates at local midnight)
     // ----------------------------------------------------------------
-    $salt = defined( 'NONCE_SALT' ) ? NONCE_SALT : 'BUNSEKI_SECURE_SALT';
-    $hash = md5( $ip . $ua . gmdate( 'Y-m-d' ) . $salt );
+    $hash = Bunseki_Helper::visitor_hash( $ip, $ua_raw, Bunseki_Helper::local_date() );
 
     // ----------------------------------------------------------------
     // 10. Custom Events
@@ -244,12 +211,12 @@ function bunseki_rest_track_handler( WP_REST_Request $request ) {
     }
 
     // ----------------------------------------------------------------
-    // 11. Seitenaufruf schreiben oder Verweildauer aktualisieren
+    // 11. Insert pageview or update time on page
     // ----------------------------------------------------------------
     $table = $wpdb->prefix . 'bunseki_log';
 
     if ( $is_update !== 0 ) {
-        // Heartbeat: nur Verweildauer updaten
+        // Heartbeat: only update duration (and late load time)
         $wpdb->query(
             $wpdb->prepare(
                 "UPDATE {$table} SET duration = %d, load_time = IF( %d > 0, %d, load_time ) WHERE hash = %s AND url = %s ORDER BY id DESC LIMIT 1",
@@ -257,7 +224,7 @@ function bunseki_rest_track_handler( WP_REST_Request $request ) {
             )
         );
     } else {
-        // Neuer Seitenaufruf
+        // New pageview
         $wpdb->insert( $table, [
             'time'           => gmdate( 'Y-m-d H:i:s' ),
             'url'            => $url,
@@ -265,9 +232,9 @@ function bunseki_rest_track_handler( WP_REST_Request $request ) {
             'ref_domain'     => $ref_domain,
             'utm_source'     => $utm,
             'hash'           => $hash,
-            'device'         => $device,
-            'os'             => $os,
-            'browser'        => $browser,
+            'device'         => $ua_info['device'],
+            'os'             => $ua_info['os'],
+            'browser'        => $ua_info['browser'],
             'lang'           => strtoupper( $lang ),
             'width'          => $width,
             'load_time'      => $load,
@@ -279,8 +246,7 @@ function bunseki_rest_track_handler( WP_REST_Request $request ) {
         ] );
     }
 
-    // Wir steigen per exit aus, damit WordPress nicht versucht, 
-    // nach dem fastcgi_finish_request() noch einmal Header zu generieren.
+    // Exit so WordPress does not try to send headers again after fastcgi_finish_request().
     exit;
 }
 

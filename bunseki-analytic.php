@@ -1,36 +1,35 @@
 <?php
 /**
  * Plugin Name: Bunseki Analytic
- * Description: High Scale Analytics (Stealth & Secure).
- * Version: 1.2.2
+ * Description: Self-hosted visitor statistics for WordPress: own tracking endpoint, bot statistics, optional AI bot blocker and access log import.
+ * Version: 1.3.0
  * Author: Saguya
  * License: GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * Requires at least: 7.0
- * Tested up to: 7.1
+ * Requires at least: 7.1
+ * Tested up to: 7.2 
  * Requires PHP: 8.4
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'BUNSEKI_VERSION', '1.2.2' );
+define( 'BUNSEKI_VERSION', '1.3.0' );
+define( 'BUNSEKI_FILE', __FILE__ );
 define( 'BUNSEKI_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BUNSEKI_URL', plugin_dir_url( __FILE__ ) );
 
 require_once BUNSEKI_PATH . 'inc/install.php';
 require_once BUNSEKI_PATH . 'inc/common.php';
-require_once BUNSEKI_PATH . 'inc/endpoint.php'; // REST tracking route (was never loaded before)
+require_once BUNSEKI_PATH . 'inc/log-parser.php';
+require_once BUNSEKI_PATH . 'inc/endpoint.php';
+require_once BUNSEKI_PATH . 'inc/cli.php';
 
 if ( is_admin() ) {
     require_once BUNSEKI_PATH . 'inc/admin.php';
 }
 
-if ( defined( 'WP_CLI' ) && WP_CLI ) {
-    require_once BUNSEKI_PATH . 'inc/cli.php';
-}
-
 // ========================================================================
-// 🛡️ Firewall: AI-Bots & Scraper blockieren (plugins_loaded, früh)
+// 🛡️ Firewall: block AI bots & scrapers (early, on plugins_loaded)
 // ========================================================================
 add_action( 'plugins_loaded', 'bunseki_firewall_check' );
 function bunseki_firewall_check() {
@@ -55,11 +54,13 @@ function bunseki_firewall_check() {
         );
 
         if ( $is_blocked ) {
-            // FIX: Geblockte Bots werden VOR dem die() noch getrackt,
-            // damit sie in der Bot-Statistik sichtbar bleiben.
+            // Record the blocked bot before exiting so it stays visible in the bot statistics.
             bunseki_insert_bot_hit( $bot );
-            header( 'HTTP/1.1 403 Forbidden' );
-            die( 'Access denied by Bunseki Firewall. Unauthorized AI scrapers are strictly prohibited.' );
+            status_header( 403 );
+            nocache_headers();
+            header( 'Content-Type: text/plain; charset=utf-8' );
+            echo 'Access denied by Bunseki Firewall. Unauthorized AI scrapers are strictly prohibited.';
+            exit;
         }
     }
 }
@@ -72,7 +73,7 @@ function bunseki_firewall_check() {
 // Bots that are actually blocked by the firewall are still recorded.
 
 // ========================================================================
-// 📦 Frontend: Tracker-Script einbinden
+// 📦 Frontend: enqueue tracker script
 // ========================================================================
 add_action( 'wp_enqueue_scripts', 'bunseki_enqueue_tracker' );
 function bunseki_enqueue_tracker() {
@@ -86,7 +87,7 @@ function bunseki_enqueue_tracker() {
         true
     );
 
-    // REST-Endpunkt URL für b-core.js
+    // REST endpoint URL for b-core.js
     wp_localize_script( 'bunseki-core', 'bunsekiAjax', [
         'rest_url' => esc_url_raw( rest_url( 'bunseki/v1/track' ) ),
     ] );
@@ -97,17 +98,17 @@ function bunseki_enqueue_tracker() {
 }
 
 // ========================================================================
-// 🚀 Cache & Optimizer Bypass (verhindert Delay/Defer von b-core.js)
+// 🚀 Cache & optimizer bypass (prevents delay/defer of b-core.js)
 // ========================================================================
 
 /**
- * Fügt data-Attribute hinzu, die gängige Cache-Plugins anweisen,
- * b-core.js nicht zu verzögern oder zu minifizieren.
+ * Adds data attributes that tell common cache plugins
+ * not to delay or minify b-core.js.
  *
- * @param string $tag    Der Script-Tag.
- * @param string $handle Das Script-Handle.
- * @param string $src    Die Script-URL.
- * @return string Modifizierter Script-Tag.
+ * @param string $tag    Script tag.
+ * @param string $handle Script handle.
+ * @param string $src    Script URL.
+ * @return string Modified script tag.
  */
 function bunseki_universal_cache_bypass( $tag, $handle, $src ) {
     if ( 'bunseki-core' === $handle || false !== strpos( (string) $src, 'b-core.js' ) ) {
@@ -131,10 +132,10 @@ add_filter( 'flying_scripts_exclude_keywords','bunseki_exclude_js_php' );
 // phpcs:enable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
 
 /**
- * Schließt b-core.js von Delay/Defer in PHP-basierten Cache-Plugins aus.
+ * Excludes b-core.js from delay/defer in PHP-based cache plugins.
  *
- * @param array|string $exclusions Bestehende Ausschlüsse.
- * @return array|string Erweiterte Ausschlüsse.
+ * @param array|string $exclusions Existing exclusions.
+ * @return array|string Extended exclusions.
  */
 function bunseki_exclude_js_php( $exclusions ) {
     if ( is_array( $exclusions ) ) {
@@ -153,15 +154,13 @@ add_action( 'bunseki_auto_import_event',    'bunseki_auto_import_cron' );
 function bunseki_auto_import_cron() {
     $path = get_option( 'bunseki_auto_log_path' );
     if ( ! $path || ! file_exists( $path ) ) return;
-    if ( ! class_exists( 'Bunseki_CLI' ) ) {
-        require_once BUNSEKI_PATH . 'inc/cli.php';
-    }
+    // Bunseki_CLI::parse_log() also works outside WP-CLI (all CLI output is guarded).
     $cli = new Bunseki_CLI();
     $cli->parse_log( [ $path ], [] );
 }
 
 // ========================================================================
-// 📊 WordPress Dashboard Widget (7-Tage-Übersicht)
+// 📊 WordPress dashboard widget (7-day overview)
 // ========================================================================
 add_action( 'wp_dashboard_setup', 'bunseki_dashboard_widget' );
 function bunseki_dashboard_widget() {
@@ -174,49 +173,55 @@ function bunseki_dashboard_widget() {
     }
 }
 
-function bunseki_render_dashboard_widget() {
+/**
+ * Visitors (sum of daily unique hashes) and pageviews of the last 7 days.
+ *
+ * @return array{0:int,1:int} [ visitors, views ]
+ */
+function bunseki_last_7_days_totals(): array {
     global $wpdb;
     $tbl   = $wpdb->prefix . 'bunseki_log';
-    $limit = gmdate( 'Y-m-d H:i:s', strtotime( '-7 days' ) );
+    $limit = gmdate( 'Y-m-d H:i:s', time() - 7 * DAY_IN_SECONDS );
+    $off   = Bunseki_Helper::tz_offset();
+    // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+    $rows = $wpdb->get_results( $wpdb->prepare(
+        "SELECT COUNT(*) AS c, COUNT(DISTINCT hash) AS u FROM $tbl WHERE time > %s GROUP BY DATE(DATE_ADD(time, INTERVAL %d SECOND))",
+        $limit, $off
+    ) );
+    $v = 0; $p = 0;
+    foreach ( (array) $rows as $r ) { $v += (int) $r->u; $p += (int) $r->c; }
+    return [ $v, $p ];
+}
 
-    // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
-    $v = $wpdb->get_var( "SELECT COUNT(DISTINCT hash) FROM $tbl WHERE time > '$limit'" );
-    // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
-    $p = $wpdb->get_var( "SELECT COUNT(*) FROM $tbl WHERE time > '$limit'" );
+function bunseki_render_dashboard_widget() {
+    [ $v, $p ] = bunseki_last_7_days_totals();
 
     echo '<div style="display:flex;justify-content:space-around;text-align:center;padding:15px 0;">';
     echo '<div><strong style="font-size:28px;color:#06b6d4;">' . esc_html( number_format( (float) $v ) ) . '</strong><br><span style="color:#64748b;">' . esc_html__( 'Visitors', 'bunseki-analytic' ) . '</span></div>';
     echo '<div><strong style="font-size:28px;color:#8b5cf6;">' . esc_html( number_format( (float) $p ) ) . '</strong><br><span style="color:#64748b;">' . esc_html__( 'Views', 'bunseki-analytic' ) . '</span></div>';
     echo '</div>';
     echo '<hr style="border:0;border-top:1px solid #e2e8f0;margin:15px 0;">';
-    echo '<a href="admin.php?page=bunseki-analytic" class="button button-primary" style="width:100%;text-align:center;">' . esc_html__( 'Open Full Dashboard', 'bunseki-analytic' ) . '</a>';
+    echo '<a href="' . esc_url( admin_url( 'admin.php?page=bunseki-analytic' ) ) . '" class="button button-primary" style="width:100%;text-align:center;">' . esc_html__( 'Open Full Dashboard', 'bunseki-analytic' ) . '</a>';
 }
 
 // ========================================================================
-// 📧 Wöchentlicher E-Mail-Report
+// 📧 Weekly e-mail report
 // ========================================================================
 add_action( 'bunseki_weekly_email_event', 'bunseki_send_weekly_report' );
 function bunseki_send_weekly_report() {
     $to = get_option( 'admin_email' );
     if ( ! $to ) return;
 
-    global $wpdb;
-    $tbl   = $wpdb->prefix . 'bunseki_log';
-    $limit = gmdate( 'Y-m-d H:i:s', strtotime( '-7 days' ) );
+    [ $v, $p ] = bunseki_last_7_days_totals();
 
-    // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
-    $v = $wpdb->get_var( "SELECT COUNT(DISTINCT hash) FROM $tbl WHERE time > '$limit'" );
-    // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
-    $p = $wpdb->get_var( "SELECT COUNT(*) FROM $tbl WHERE time > '$limit'" );
-
-    /* translators: %s: Besucherzahl */
+    /* translators: %s: number of visitors */
     $subject = sprintf(
         __( '📊 Bunseki: Your Weekly Traffic Report (%s Visitors)', 'bunseki-analytic' ),
         number_format( (float) $v )
     );
 
     $message = sprintf(
-        /* translators: 1: Besucherzahl, 2: Seitenaufrufe */
+        /* translators: 1: number of visitors, 2: number of pageviews */
         __( "Hello!\n\nHere is your weekly traffic summary:\n\nVisitors: %1\$s\nPageviews: %2\$s\n\nLog in to your dashboard for more details.\n\nYour Bunseki Analytic Plugin", 'bunseki-analytic' ),
         number_format( (float) $v ),
         number_format( (float) $p )
@@ -226,41 +231,44 @@ function bunseki_send_weekly_report() {
 }
 
 // ========================================================================
-// ⚡ DB-Indizes einmalig anlegen (schnellere Aggregation)
-// ========================================================================
-add_action( 'admin_init', 'bunseki_add_db_indexes_once' );
-function bunseki_add_db_indexes_once() {
-    if ( get_option( 'bunseki_db_indexes_added_v1' ) === '1' ) return;
-
-    global $wpdb;
-    $tbl = $wpdb->prefix . 'bunseki_log';
-
-    $wpdb->suppress_errors( true );
-    // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
-    $wpdb->query( "ALTER TABLE $tbl ADD INDEX idx_url    (url(191))" );
-    // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
-    $wpdb->query( "ALTER TABLE $tbl ADD INDEX idx_ref    (ref_domain(100))" );
-    // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
-    $wpdb->query( "ALTER TABLE $tbl ADD INDEX idx_utm    (utm_source(50))" );
-    // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
-    $wpdb->query( "ALTER TABLE $tbl ADD INDEX idx_status (status)" );
-    // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
-    $wpdb->query( "ALTER TABLE $tbl ADD INDEX idx_device (device)" );
-    $wpdb->suppress_errors( false );
-
-    update_option( 'bunseki_db_indexes_added_v1', '1' );
-}
-
-// ========================================================================
 // 🔒 Opt-Out Shortcode
 // ========================================================================
 add_shortcode( 'bunseki_opt_out', 'bunseki_render_opt_out' );
 function bunseki_render_opt_out() {
+    $done = esc_js( __( 'Tracking disabled successfully.', 'bunseki-analytic' ) );
     return '<div class="bunseki-opt-out-wrap" style="padding:15px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">
         <p style="margin-top:0;">' . esc_html__( 'Click the button below to opt-out of all statistical tracking on this website.', 'bunseki-analytic' ) . '</p>
-        <button style="padding:8px 16px;background:#334155;color:white;border:none;border-radius:4px;cursor:pointer;"
-            onclick="document.cookie=\'bunseki_dnt=1; max-age=31536000; path=/\'; alert(\'' . esc_js( __( 'Tracking disabled successfully.', 'bunseki-analytic' ) ) . '\');">
+        <button type="button" style="padding:8px 16px;background:#334155;color:white;border:none;border-radius:4px;cursor:pointer;"
+            onclick="document.cookie=\'bunseki_dnt=1; max-age=31536000; path=/; SameSite=Lax\'; this.disabled=true; this.nextElementSibling.textContent=\'' . $done . '\';">
             ' . esc_html__( 'Disable Tracking', 'bunseki-analytic' ) . '
         </button>
+        <span class="bunseki-opt-out-status" role="status" style="margin-left:10px;font-weight:600;"></span>
     </div>';
+}
+
+// ========================================================================
+// GitHub updates (Plugin Update Checker, bundled in lib/)
+// ========================================================================
+add_action( 'init', 'bunseki_init_update_checker' );
+function bunseki_init_update_checker() {
+    // Update checks only matter in the admin, for WP-CLI and for WP-Cron
+    if ( ! is_admin() && ! ( defined( 'WP_CLI' ) && WP_CLI ) && ! wp_doing_cron() ) {
+        return;
+    }
+
+    $puc_path = BUNSEKI_PATH . 'lib/plugin-update-checker/plugin-update-checker.php';
+    if ( ! is_readable( $puc_path ) ) {
+        return; // Library missing: no update checks, the plugin keeps working
+    }
+    require_once $puc_path;
+
+    $checker = \YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(
+        'https://github.com/Suzu-chan1990/Bunseki-Analytic/',
+        BUNSEKI_FILE,
+        'bunseki-analytic'
+    );
+
+    // Install the ZIP attached to the GitHub release (folder "bunseki-analytic" inside).
+    // Without an attached ZIP, PUC falls back to the source code archive of the release tag.
+    $checker->getVcsApi()->enableReleaseAssets();
 }

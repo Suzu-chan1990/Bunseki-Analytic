@@ -1,113 +1,133 @@
 <?php
+/**
+ * Bunseki Analytic – Admin dashboard, settings, CSV export and log importer
+ *
+ * @package Bunseki_Analytic
+ */
+
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-// AUTO PATCH V2: Chart.js sauber einbinden
-add_action( 'admin_enqueue_scripts', 'bunseki_enqueue_chart_js' );
-function bunseki_enqueue_chart_js( $hook ) {
-    if ( strpos( $hook, 'bunseki-analytic' ) !== false ) {
-        wp_enqueue_script( 'chart-js', BUNSEKI_URL . 'js/chart.min.js', [], '4.0.0', true );
-    }
-}
-// AUTO PATCH: wp_enqueue_style anstelle von hardcodiertem HTML
+// ========================================================================
+// Assets (dashboard page only)
+// ========================================================================
 add_action( 'admin_enqueue_scripts', 'bunseki_enqueue_admin_assets' );
 function bunseki_enqueue_admin_assets( $hook ) {
-    if ( strpos( $hook, 'bunseki-analytic' ) !== false ) {
-        wp_enqueue_style( 'bunseki-admin-css', BUNSEKI_URL . 'css/admin.css', [], BUNSEKI_VERSION );
-    }
-}
+    if ( ! in_array( $hook, [ 'toplevel_page_bunseki-analytic', 'bunseki_page_bunseki-importer' ], true ) ) return;
 
-// AUTO PATCH: global stats guards
-// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
-if (!isset($stats_lang) || !is_array($stats_lang)) { $stats_lang = []; }
-// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
-if (!isset($stats_device) || !is_array($stats_device)) { $stats_device = []; }
-// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
-if (!isset($stats_ref) || !is_array($stats_ref)) { $stats_ref = []; }
-// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
-if (!isset($stats_search) || !is_array($stats_search)) { $stats_search = []; }
-// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
-if (!isset($stats_pages) || !is_array($stats_pages)) { $stats_pages = []; }
+    wp_enqueue_style( 'bunseki-admin-css', BUNSEKI_URL . 'css/admin.css', [], BUNSEKI_VERSION );
 
-
-// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
-if (!isset($top_events) || !is_array($top_events)) { $top_events = []; }
-
-// AUTO PATCH: stats_lang guard
-// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
-if (!isset($stats_lang) || !is_array($stats_lang)) { $stats_lang = []; }
-
-// Optionen für das Settings-Tab registrieren (Bugfix: Block Bots hinzugefügt)
-add_action('admin_init', 'bunseki_register_admin_settings');
-function bunseki_register_admin_settings() {
-    register_setting('bunseki_importer_group', 'bunseki_disable_live_bots', ['type' => 'integer', 'sanitize_callback' => 'absint']);
-    register_setting('bunseki_importer_group', 'bunseki_block_bots', ['type' => 'integer', 'sanitize_callback' => 'absint']);
-}
-
-add_action('admin_menu', 'bunseki_menu');
-function bunseki_menu() {
-    add_menu_page('Bunseki', 'Bunseki', 'manage_options', 'bunseki-analytic', 'bunseki_render_page', 'dashicons-chart-bar', 80);
-    add_submenu_page('bunseki-analytic', __('Dashboard', 'bunseki-analytic'), __('Dashboard', 'bunseki-analytic'), 'manage_options', 'bunseki-analytic', 'bunseki_render_page');
-    add_submenu_page('bunseki-analytic', __('Log Importer', 'bunseki-analytic'), __('Log Importer', 'bunseki-analytic'), 'manage_options', 'bunseki-importer', 'bunseki_render_importer'); // Disabled: Log Importer replaced by Live Bot Tracker
-}
-
-add_action('admin_enqueue_scripts', 'bunseki_styles');
-function bunseki_styles($hook) {
-    if($hook != 'toplevel_page_bunseki-analytic') return;
-    
-    // GARANTIERT RICHTIGER CSS PFAD OHNE "../"
-    // phpcs:ignore WordPress.WP.EnqueuedResourceParameters.MissingVersion
-    wp_enqueue_style('bunseki-css', plugin_dir_url(dirname(__FILE__)) . 'css/admin.css');
-    
-    // JS FÜR TABS MIT BACKTICKS (Keine PHP-String-Fehler mehr!)
-    wp_add_inline_script('jquery', '
-        jQuery(document).ready(function($) {
-            $(".bun-tab").click(function() {
+    // Tab switching; the last active tab is remembered per browser.
+    wp_enqueue_script( 'jquery' );
+    wp_add_inline_script( 'jquery', '
+        jQuery(function ($) {
+            $(".bun-tab[data-target]").on("click", function () {
                 var target = $(this).data("target");
-                $(".bun-tab").removeClass("active");
+                $(".bun-tab[data-target]").removeClass("active");
                 $(this).addClass("active");
                 $(".bun-tab-content").removeClass("active").hide();
                 $("#" + target).addClass("active").show();
-                localStorage.setItem("bunseki_active_tab", target);
+                try { localStorage.setItem("bunseki_active_tab", target); } catch (e) {}
             });
-            var savedTab = localStorage.getItem("bunseki_active_tab") || "tab-overview";
-            $(`.bun-tab[data-target="${savedTab}"]`).click();
+            var saved = "tab-overview";
+            try { saved = localStorage.getItem("bunseki_active_tab") || saved; } catch (e) {}
+            var $tab = $(".bun-tab[data-target=\"" + saved + "\"]");
+            ($tab.length ? $tab : $(".bun-tab[data-target]").first()).trigger("click");
         });
-    ');
+    ' );
+}
+
+// ========================================================================
+// Menu
+// ========================================================================
+add_action( 'admin_menu', 'bunseki_menu' );
+function bunseki_menu() {
+    add_menu_page( 'Bunseki', 'Bunseki', 'manage_options', 'bunseki-analytic', 'bunseki_render_page', 'dashicons-chart-bar', 80 );
+    add_submenu_page( 'bunseki-analytic', __( 'Dashboard', 'bunseki-analytic' ), __( 'Dashboard', 'bunseki-analytic' ), 'manage_options', 'bunseki-analytic', 'bunseki_render_page' );
+    add_submenu_page( 'bunseki-analytic', __( 'Log Importer', 'bunseki-analytic' ), __( 'Log Importer', 'bunseki-analytic' ), 'manage_options', 'bunseki-importer', 'bunseki_render_importer' );
+}
+
+/**
+ * Page header in the Tegatai style: banner on the left, version badge on the right.
+ */
+function bunseki_render_brand_header( ?callable $tools = null ) {
+    $base = BUNSEKI_URL . 'assets/';
+    ?>
+    <div class="bun-header bun-header-brand">
+        <div class="bun-brand">
+            <img class="bun-banner" src="<?php echo esc_url( $base . 'banner-772x250.png' ); ?>" srcset="<?php echo esc_url( $base . 'banner-772x250.png' ); ?> 1x, <?php echo esc_url( $base . 'banner-1544x500.webp' ); ?> 2x" width="772" height="250" alt="Bunseki Analytic">
+        </div>
+        <div class="bun-header-side">
+            <span class="bun-badge">v<?php echo esc_html( BUNSEKI_VERSION ); ?></span>
+            <?php if ( $tools ) { $tools(); } ?>
+        </div>
+    </div>
+    <?php
+}
+
+/**
+ * Allowed dashboard ranges -> number of days.
+ */
+function bunseki_range_days( string $range ): int {
+    return $range === 'all' ? 3650 : (int) $range;
+}
+
+function bunseki_sanitize_range( $range ): string {
+    $range = is_string( $range ) ? sanitize_key( $range ) : '30';
+    return in_array( $range, [ '30', '60', '90', '120', 'all' ], true ) ? $range : '30';
+}
+
+// ========================================================================
+// CSV export (runs on admin-post.php, before any admin HTML is sent)
+// ========================================================================
+add_action( 'admin_post_bunseki_export', 'bunseki_export_csv' );
+function bunseki_export_csv() {
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_die( esc_html__( 'Access denied.', 'bunseki-analytic' ), 403 );
+    }
+    check_admin_referer( 'bunseki_export' );
+
+    global $wpdb;
+    // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.MissingUnslash
+    $range      = bunseki_sanitize_range( $_GET['range'] ?? '30' );
+    $date_limit = gmdate( 'Y-m-d H:i:s', time() - bunseki_range_days( $range ) * DAY_IN_SECONDS );
+    $tbl_usr    = $wpdb->prefix . 'bunseki_log';
+
+    // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+    $results = $wpdb->get_results( $wpdb->prepare(
+        "SELECT time, url, referrer, ref_domain, utm_source, device, os, browser, lang, status, duration FROM $tbl_usr WHERE time > %s ORDER BY id DESC LIMIT 50000",
+        $date_limit
+    ), ARRAY_A );
+
+    nocache_headers();
+    header( 'Content-Type: text/csv; charset=utf-8' );
+    header( 'Content-Disposition: attachment; filename="bunseki_export_' . wp_date( 'Y-m-d' ) . '.csv"' );
+
+    // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+    $output = fopen( 'php://output', 'w' );
+    fwrite( $output, "\xEF\xBB\xBF" ); // UTF-8 BOM so Excel shows Japanese text correctly
+    fputcsv( $output, [ 'Time (UTC)', 'URL', 'Referrer', 'Source', 'UTM', 'Device', 'OS', 'Browser', 'Lang', 'Status', 'Duration (s)' ], ',', '"', '\\' );
+    foreach ( (array) $results as $row ) {
+        // Neutralize spreadsheet formulas (CSV injection) in user-controlled text fields.
+        foreach ( $row as $k => $v ) {
+            if ( is_string( $v ) && $v !== '' && strpbrk( $v[0], "=+-@\t\r" ) !== false ) {
+                $row[ $k ] = "'" . $v;
+            }
+        }
+        fputcsv( $output, $row, ',', '"', '\\' );
+    }
+    // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
+    fclose( $output );
+    exit;
 }
 
 function bunseki_render_page() {
-    // --- CSV EXPORT FEATURE ---
-    // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-    if (isset($_GET['bunseki_export']) && $_GET['bunseki_export'] == '1') {
-        // phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized, WordPress.Security.ValidatedSanitizedInput.MissingUnslash
-        $range = (isset($_GET['range'])) ? $_GET['range'] : '30';
-        $days = ($range === 'all') ? 3650 : (int)$range;
-        $date_limit = gmdate('Y-m-d H:i:s', strtotime("-$days days"));
-        global $wpdb;
-        $tbl_usr = $wpdb->prefix . 'bunseki_log';
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
-        $results = $wpdb->get_results("SELECT time, url, referrer, device, os, browser, lang, status, duration FROM $tbl_usr WHERE time > '$date_limit' ORDER BY id DESC LIMIT 50000", ARRAY_A);
-        
-        header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename="bunseki_export_' . gmdate('Y-m-d') . '.csv"');
-        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
-        $output = fopen('php://output', 'w');
-        fputcsv($output, array('Time', 'URL', 'Referrer', 'Device', 'OS', 'Browser', 'Lang', 'Status', 'Duration (s)'));
-        if ($results) { foreach ($results as $row) { fputcsv($output, $row); } }
-        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
-        fclose($output);
-        exit;
-    }
-
     global $wpdb;
-    
-    // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-    $allowed_ranges = ['30', '60', '90', '120', 'all'];
-    // phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized, WordPress.Security.ValidatedSanitizedInput.MissingUnslash
-    $range = (isset($_GET['range']) && in_array($_GET['range'], $allowed_ranges)) ? $_GET['range'] : '30';
-    $days = ($range === 'all') ? 3650 : (int)$range;
-    
-    $cache_key = 'bunseki_dashboard_stats_v7_' . $range;
+
+    // phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.MissingUnslash
+    $range = bunseki_sanitize_range( $_GET['range'] ?? '30' );
+    $days  = bunseki_range_days( $range );
+
+    $cache_key = 'bunseki_dashboard_stats_v8_' . $range;
     // phpcs:ignore WordPress.Security.NonceVerification.Recommended
     $is_refresh = (isset($_GET['refresh']) && $_GET['refresh'] == 1);
     
@@ -118,13 +138,14 @@ function bunseki_render_page() {
         $tbl_usr = $wpdb->prefix . 'bunseki_log';
         $tbl_bot = $wpdb->prefix . 'bunseki_bots';
         
-        // phpcs:ignore WordPress.DateTime.RestrictedFunctions.date_date
-        $date_limit = gmdate('Y-m-d H:i:s', strtotime("-$days days"));
-        // phpcs:ignore WordPress.DateTime.RestrictedFunctions.date_date
-        $date_limit_bot = gmdate('Y-m-d', strtotime("-$days days"));
+        // Day boundaries follow the site timezone (Settings > General), data is stored in UTC.
+        $tz_off         = Bunseki_Helper::tz_offset();
+        $first_day      = Bunseki_Helper::local_date( time() - $days * DAY_IN_SECONDS );
+        $date_limit     = Bunseki_Helper::local_day_start_utc( $first_day );
+        $date_limit_bot = $first_day;
         
         // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.NoCaching
-        $chart_raw_usr = $wpdb->get_results("SELECT DATE(time) as d, COUNT(*) as c, COUNT(DISTINCT hash) as u FROM $tbl_usr WHERE time > '$date_limit' GROUP BY DATE(time)");
+        $chart_raw_usr = $wpdb->get_results($wpdb->prepare("SELECT DATE(DATE_ADD(time, INTERVAL %d SECOND)) as d, COUNT(*) as c, COUNT(DISTINCT hash) as u FROM $tbl_usr WHERE time >= %s GROUP BY d", $tz_off, $date_limit));
         
         $views = 0; $visitors = 0;
         foreach($chart_raw_usr as $r) { 
@@ -133,11 +154,11 @@ function bunseki_render_page() {
         }
         
         // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.NoCaching
-        $bot_hits = $wpdb->get_var("SELECT SUM(hits) FROM $tbl_bot WHERE date > '$date_limit_bot'");
+        $bot_hits = $wpdb->get_var("SELECT SUM(hits) FROM $tbl_bot WHERE date >= '$date_limit_bot'");
         // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.NoCaching
-        $avg_duration = $wpdb->get_var("SELECT AVG(duration) FROM $tbl_usr WHERE time > '$date_limit' AND duration > 0");
+        $avg_duration = $wpdb->get_var("SELECT AVG(duration) FROM $tbl_usr WHERE time >= '$date_limit' AND duration > 0");
         // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.NoCaching
-        $chart_raw_bot = $wpdb->get_results("SELECT date as d, SUM(hits) as c FROM $tbl_bot WHERE date > '$date_limit_bot' GROUP BY date");
+        $chart_raw_bot = $wpdb->get_results("SELECT date as d, SUM(hits) as c FROM $tbl_bot WHERE date >= '$date_limit_bot' GROUP BY date");
         
         $usr_map = []; foreach($chart_raw_usr as $r) { $usr_map[$r->d] = $r->c; }
         $bot_map = []; foreach($chart_raw_bot as $r) { $bot_map[$r->d] = $r->c; }
@@ -146,8 +167,7 @@ function bunseki_render_page() {
     $max_val = 10;
     $chart_days = ($days > 120) ? 120 : $days; // Cap visual chart at 120 days max to prevent browser lag
     for($i=$chart_days; $i>=0; $i--) {
-            // phpcs:ignore WordPress.DateTime.RestrictedFunctions.date_date
-            $d = gmdate('Y-m-d', strtotime("-$i days"));
+            $d = Bunseki_Helper::local_date( time() - $i * DAY_IN_SECONDS );
             $u = isset($usr_map[$d]) ? $usr_map[$d] : 0;
             $b = isset($bot_map[$d]) ? $bot_map[$d] : 0;
             $total = $u + $b;
@@ -156,29 +176,29 @@ function bunseki_render_page() {
         }
 
         // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.NoCaching
-        $top_pages = $wpdb->get_results("SELECT url, COUNT(*) as c FROM $tbl_usr WHERE time > '$date_limit' AND status = 200 AND url NOT LIKE '%//%' AND url != '' GROUP BY url ORDER BY c DESC LIMIT 10");
+        $top_pages = $wpdb->get_results("SELECT url, COUNT(*) as c FROM $tbl_usr WHERE time >= '$date_limit' AND status = 200 AND url NOT LIKE '%//%' AND url != '' GROUP BY url ORDER BY c DESC LIMIT 10");
         // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.NoCaching
-        $top_duration = $wpdb->get_results("SELECT url, AVG(duration) as d, COUNT(*) as c FROM $tbl_usr WHERE time > '$date_limit' AND status = 200 AND duration > 10 AND url != '/' AND url NOT LIKE '%//%' GROUP BY url HAVING c > 1 ORDER BY d DESC LIMIT 5");
+        $top_duration = $wpdb->get_results("SELECT url, AVG(duration) as d, COUNT(*) as c FROM $tbl_usr WHERE time >= '$date_limit' AND status = 200 AND duration > 10 AND url != '/' AND url NOT LIKE '%//%' GROUP BY url HAVING c > 1 ORDER BY d DESC LIMIT 5");
         // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.NoCaching
-        $top_refs = $wpdb->get_results("SELECT ref_domain, COUNT(*) as c FROM $tbl_usr WHERE time > '$date_limit' AND ref_domain != 'Internal' GROUP BY ref_domain ORDER BY c DESC LIMIT 10");
+        $top_refs = $wpdb->get_results("SELECT ref_domain, COUNT(*) as c FROM $tbl_usr WHERE time >= '$date_limit' AND ref_domain NOT IN ('Internal', '') GROUP BY ref_domain ORDER BY c DESC LIMIT 10");
         // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.NoCaching
-        $top_search = $wpdb->get_results("SELECT search_term, COUNT(*) as c, MIN(search_results) as found FROM $tbl_usr WHERE time > '$date_limit' AND search_term != '' GROUP BY search_term ORDER BY c DESC LIMIT 10");
+        $top_search = $wpdb->get_results("SELECT search_term, COUNT(*) as c, MIN(search_results) as found FROM $tbl_usr WHERE time >= '$date_limit' AND search_term != '' GROUP BY search_term ORDER BY c DESC LIMIT 10");
         // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.NoCaching
-        $top_bots = $wpdb->get_results("SELECT bot_name, SUM(hits) as h FROM $tbl_bot WHERE date > '$date_limit_bot' GROUP BY bot_name ORDER BY h DESC LIMIT 10");
+        $top_bots = $wpdb->get_results("SELECT bot_name, SUM(hits) as h FROM $tbl_bot WHERE date >= '$date_limit_bot' GROUP BY bot_name ORDER BY h DESC LIMIT 10");
         // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.NoCaching
-        $stats_device = $wpdb->get_results("SELECT device, COUNT(*) as c FROM $tbl_usr WHERE time > '$date_limit' GROUP BY device ORDER BY c DESC");
+        $stats_device = $wpdb->get_results("SELECT device, COUNT(*) as c FROM $tbl_usr WHERE time >= '$date_limit' GROUP BY device ORDER BY c DESC");
         // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.NoCaching
-        $stats_lang = $wpdb->get_results("SELECT lang, COUNT(*) as c FROM $tbl_usr WHERE time > '$date_limit' GROUP BY lang ORDER BY c DESC LIMIT 10");
+        $stats_lang = $wpdb->get_results("SELECT UPPER(lang) as lang, COUNT(*) as c FROM $tbl_usr WHERE time >= '$date_limit' AND lang != '' GROUP BY UPPER(lang) ORDER BY c DESC LIMIT 10");
         // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.NoCaching
-        $lost_chances = $wpdb->get_results("SELECT search_term, COUNT(*) as c FROM $tbl_usr WHERE time > '$date_limit' AND search_term != '' AND search_results = 0 GROUP BY search_term ORDER BY c DESC LIMIT 5");
+        $lost_chances = $wpdb->get_results("SELECT search_term, COUNT(*) as c FROM $tbl_usr WHERE time >= '$date_limit' AND search_term != '' AND search_results = 0 GROUP BY search_term ORDER BY c DESC LIMIT 5");
         // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.NoCaching
-        $bot_404 = $wpdb->get_results("SELECT url, SUM(hits) as h FROM $tbl_bot WHERE date > '$date_limit_bot' AND status = 404 GROUP BY url ORDER BY h DESC LIMIT 5");
+        $bot_404 = $wpdb->get_results("SELECT url, SUM(hits) as h FROM $tbl_bot WHERE date >= '$date_limit_bot' AND status = 404 GROUP BY url ORDER BY h DESC LIMIT 5");
         // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.NoCaching
         $tbl_evt = $wpdb->prefix . 'bunseki_events';
         // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.NoCaching
-        $top_events = $wpdb->get_results("SELECT event_name, event_val, COUNT(*) as c FROM $tbl_evt WHERE time > '$date_limit' GROUP BY event_name, event_val ORDER BY c DESC LIMIT 15");
+        $top_events = $wpdb->get_results("SELECT event_name, event_val, COUNT(*) as c FROM $tbl_evt WHERE time >= '$date_limit' GROUP BY event_name, event_val ORDER BY c DESC LIMIT 15");
         // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.NoCaching
-        $top_utm = $wpdb->get_results("SELECT utm_source, COUNT(*) as c, COUNT(DISTINCT hash) as u FROM $tbl_usr WHERE time > '$date_limit' AND utm_source != '' GROUP BY utm_source ORDER BY c DESC LIMIT 15");
+        $top_utm = $wpdb->get_results("SELECT utm_source, COUNT(*) as c, COUNT(DISTINCT hash) as u FROM $tbl_usr WHERE time >= '$date_limit' AND utm_source != '' GROUP BY utm_source ORDER BY c DESC LIMIT 15");
 
         $data = compact('views', 'visitors', 'bot_hits', 'avg_duration', 'chart_data', 'max_val', 'top_pages', 'top_duration', 'top_refs', 'top_search', 'top_bots', 'stats_device', 'bot_404', 'stats_lang', 'lost_chances', 'top_utm', 'top_events');
         set_transient($cache_key, $data, 900);
@@ -186,13 +206,8 @@ function bunseki_render_page() {
         extract($data);
     }
     
-    // Lokaler Guard, falls der Cache veraltet ist
-    if (!isset($top_events) || !is_array($top_events)) { $top_events = []; }
-    
-    // phpcs:ignore WordPress.DateTime.RestrictedFunctions.date_date
-    $two_hours_ago = date('Y-m-d H:i:s', strtotime("-2 hours"));
-    // phpcs:ignore WordPress.DateTime.RestrictedFunctions.date_date
-    $five_mins_ago = date('Y-m-d H:i:s', strtotime("-5 minutes"));
+    $two_hours_ago = gmdate( 'Y-m-d H:i:s', time() - 2 * HOUR_IN_SECONDS );
+    $five_mins_ago = gmdate( 'Y-m-d H:i:s', time() - 5 * MINUTE_IN_SECONDS );
     
     // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.NoCaching
     $live = $wpdb->get_var("SELECT COUNT(DISTINCT hash) FROM " . $wpdb->prefix . "bunseki_log WHERE time > '$two_hours_ago' AND DATE_ADD(time, INTERVAL duration SECOND) > '$five_mins_ago'");
@@ -219,26 +234,36 @@ function bunseki_render_page() {
     $health_ok = ( $live_ts && ( time() - $live_ts ) < 3 * HOUR_IN_SECONDS );
     ?>
     <div class="bun-wrap">
-        <div class="bun-header">
-            <h1 class="bun-title">📊 Bunseki <span class="bun-badge">v<?php echo esc_html(BUNSEKI_VERSION); ?></span></h1>
-            <div style="display:flex; gap:10px; align-items:center;">
-            <form method="GET" action="admin.php" style="margin:0;">
-                <input type="hidden" name="page" value="bunseki-analytic">
-                <select name="range" onchange="this.form.submit()" style="padding: 2px 24px 2px 8px; font-size: 13px; border-radius: 4px; border: 1px solid #cbd5e1; color: #334155; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-                    <option value="30" <?php selected($range, '30'); ?>><?php esc_html_e('Last 30 Days', 'bunseki-analytic'); ?></option>
-                    <option value="60" <?php selected($range, '60'); ?>><?php esc_html_e('Last 60 Days', 'bunseki-analytic'); ?></option>
-                    <option value="90" <?php selected($range, '90'); ?>><?php esc_html_e('Last 90 Days', 'bunseki-analytic'); ?></option>
-                    <option value="120" <?php selected($range, '120'); ?>><?php esc_html_e('Last 120 Days', 'bunseki-analytic'); ?></option>
-                    <option value="all" <?php selected($range, 'all'); ?>><?php esc_html_e('All Time', 'bunseki-analytic'); ?></option>
-                </select>
-            </form>
-            <a href="?page=bunseki-analytic&refresh=1&range=<?php echo esc_attr($range); ?>" class="page-title-action">🔄 <?php esc_html_e('Refresh', 'bunseki-analytic'); ?></a>
-                <a href="<?php echo esc_url( admin_url( "admin.php?page=bunseki-analytic&bunseki_export=1&range=" . $range ) ); ?>" class="page-title-action" target="_blank" style="background:#10b981; color:#fff; border-color:#059669;">📥 <?php esc_html_e('Export CSV', 'bunseki-analytic'); ?></a>
+        <?php bunseki_render_brand_header( function () use ( $range, $live ) { ?>
+            <div class="bun-toolbar">
+                <form method="GET" action="admin.php">
+                    <input type="hidden" name="page" value="bunseki-analytic">
+                    <select name="range" class="bun-select" onchange="this.form.submit()">
+                        <option value="30" <?php selected($range, '30'); ?>><?php esc_html_e('Last 30 Days', 'bunseki-analytic'); ?></option>
+                        <option value="60" <?php selected($range, '60'); ?>><?php esc_html_e('Last 60 Days', 'bunseki-analytic'); ?></option>
+                        <option value="90" <?php selected($range, '90'); ?>><?php esc_html_e('Last 90 Days', 'bunseki-analytic'); ?></option>
+                        <option value="120" <?php selected($range, '120'); ?>><?php esc_html_e('Last 120 Days', 'bunseki-analytic'); ?></option>
+                        <option value="all" <?php selected($range, 'all'); ?>><?php esc_html_e('All Time', 'bunseki-analytic'); ?></option>
+                    </select>
+                </form>
+                <a href="<?php echo esc_url( admin_url( 'admin.php?page=bunseki-analytic&refresh=1&range=' . $range ) ); ?>" class="button button-secondary"><?php esc_html_e('Refresh', 'bunseki-analytic'); ?></a>
+                <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=bunseki_export&range=' . $range ), 'bunseki_export' ) ); ?>" class="button button-primary"><?php esc_html_e('Export CSV', 'bunseki-analytic'); ?></a>
                 <div class="bun-live <?php echo ($live > 0) ? 'active' : ''; ?>"><span class="dot"></span> <?php echo esc_html($live); ?> <?php esc_html_e('Live', 'bunseki-analytic'); ?></div>
+            </div>
+        <?php } ); ?>
+
+        <div class="bun-nav">
+            <div class="bun-tabs-nav">
+                <div class="bun-tab active" data-target="tab-overview"><?php esc_html_e('Overview', 'bunseki-analytic'); ?></div>
+                <div class="bun-tab" data-target="tab-content"><?php esc_html_e('Content & Engagement', 'bunseki-analytic'); ?></div>
+                <div class="bun-tab" data-target="tab-marketing"><?php esc_html_e('Marketing & UTM', 'bunseki-analytic'); ?></div>
+                <div class="bun-tab" data-target="tab-tech"><?php esc_html_e('Acquisition & Tech', 'bunseki-analytic'); ?></div>
+                <div class="bun-tab" data-target="tab-settings"><?php esc_html_e('Settings', 'bunseki-analytic'); ?></div>
+                <a class="bun-tab bun-tab-link" href="<?php echo esc_url( admin_url( 'admin.php?page=bunseki-importer' ) ); ?>"><?php esc_html_e('Log Importer', 'bunseki-analytic'); ?></a>
             </div>
         </div>
 
-        <div class="bun-card" style="margin-bottom:25px; border-left: 4px solid <?php echo $health_ok ? '#10b981' : '#ef4444'; ?>;">
+        <div class="bun-card" style="margin-bottom:18px; border-left: 4px solid <?php echo $health_ok ? '#10b981' : '#ef4444'; ?>;">
             <h3 style="margin-bottom:10px;"><span>🩺 <?php esc_html_e('Tracking Health', 'bunseki-analytic'); ?></span></h3>
             <div style="display:flex; gap:30px; flex-wrap:wrap; align-items:center; font-size:14px;">
                 <div>
@@ -267,14 +292,6 @@ function bunseki_render_page() {
         });
         </script>
 
-        <div class="bun-tabs-nav">
-            <div class="bun-tab active" data-target="tab-overview">🏠 <?php esc_html_e('Overview', 'bunseki-analytic'); ?></div>
-            <div class="bun-tab" data-target="tab-content">🎬 <?php esc_html_e('Content & Engagement', 'bunseki-analytic'); ?></div>
-            <div class="bun-tab" data-target="tab-marketing">🎯 <?php esc_html_e('Marketing & UTM', 'bunseki-analytic'); ?></div>
-            <div class="bun-tab" data-target="tab-tech">📡 <?php esc_html_e('Acquisition & Tech', 'bunseki-analytic'); ?></div>
-            <div class="bun-tab" data-target="tab-settings">⚙️ <?php esc_html_e('Settings', 'bunseki-analytic'); ?></div>
-        </div>
-
         <div id="tab-overview" class="bun-tab-content active">
             <div class="bun-grid-kpi">
                 <div class="bun-card kpi">
@@ -294,7 +311,7 @@ function bunseki_render_page() {
                 </div>
             </div>
 
-            <div class="bun-card chart-card" style="margin-bottom:25px;">
+            <div class="bun-card chart-card">
                 <h3 style="display:flex; justify-content:space-between; align-items:center;">
                     <span>📈 <?php echo esc_html(/* translators: %s: Time range */ sprintf(__('Traffic Stream (%s)', 'bunseki-analytic'), $range === 'all' ? 'All' : $range.' Days')); ?></span>
                     <span style="font-size:13px; font-weight:normal; color:#64748b;">
@@ -313,7 +330,7 @@ function bunseki_render_page() {
                                 <div class="b-usr" style="height:<?php echo esc_attr($h_u); ?>%"></div>
                             </div>
                             <div style="text-align:center; font-size:10px; color:#94a3b8; margin-top:8px; font-weight:500;">
-                                <?php echo esc_html(gmdate('d.m', strtotime($date))); ?>
+                                <?php echo esc_html( substr( $date, 8, 2 ) . '.' . substr( $date, 5, 2 ) ); ?>
                             </div>
                         </div>
                     <?php endforeach; ?>
@@ -506,8 +523,8 @@ function bunseki_render_page() {
                     <div class="bun-card">
                         <h3>🛡️ <?php esc_html_e('Security & Firewall', 'bunseki-analytic'); ?></h3>
                         <form method="post" action="options.php">
-                            <?php settings_fields('bunseki_importer_group'); ?>
-                            
+                            <?php settings_fields('bunseki_settings_group'); ?>
+
                             <label style="font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 10px; cursor: pointer;">
                                 <input type="hidden" name="bunseki_block_bots" value="0">
                                 <input type="checkbox" name="bunseki_block_bots" value="1" <?php checked(get_option('bunseki_block_bots', '0'), '1'); ?>>
@@ -516,6 +533,14 @@ function bunseki_render_page() {
                             <p style="color: #64748b; font-size: 13px; margin-top: 5px;"><?php esc_html_e('When activated, Bunseki acts as a firewall. It instantly returns a 403 Forbidden status to known AI training bots (like GPTBot, ClaudeBot, ByteSpider) and aggressive generic scrapers. This protects your content and saves massive server bandwidth. Good bots (Google, Bing) are still allowed.', 'bunseki-analytic'); ?></p>
                             
                             <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;">
+
+                            <label style="font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                                <input type="hidden" name="bunseki_delete_on_uninstall" value="0">
+                                <input type="checkbox" name="bunseki_delete_on_uninstall" value="1" <?php checked( (int) get_option( 'bunseki_delete_on_uninstall', 0 ), 1 ); ?>>
+                                <?php esc_html_e('Delete all statistics when the plugin is deleted', 'bunseki-analytic'); ?>
+                            </label>
+                            <p style="color: #64748b; font-size: 13px; margin-top: 5px;"><?php esc_html_e('Off by default: deactivating or deleting Bunseki keeps your data. Turn this on only if you want the tables and settings removed together with the plugin.', 'bunseki-analytic'); ?></p>
+
                             <?php submit_button(__('Save Settings', 'bunseki-analytic')); ?>
                         </form>
                     </div>
@@ -538,47 +563,49 @@ function bunseki_render_page() {
 function bunseki_render_importer() {
     $nonce = wp_create_nonce('bunseki_import_log');
     ?>
-    <div class="wrap" style="font-family: 'Inter', system-ui, sans-serif; max-width: 800px;">
-        <h1 style="font-weight: 800; font-size: 26px; display:flex; align-items:center; gap:10px;">
-            📁 Access Log Importer
-        </h1>
-        <p style="color: #64748b; font-size: 15px;"><?php esc_html_e('Import historical Apache or Nginx access logs (.log) directly into the Bunseki database. The system reads the file in resource-friendly chunks so that even gigantic logs will not crash your server.', 'bunseki-analytic'); ?></p>
-        
-        <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 25px; margin-top: 25px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            <h3 style="margin-top: 0; font-size: 16px; border-bottom: 1px solid #f1f5f9; padding-bottom: 15px;"><?php esc_html_e('Start Import', 'bunseki-analytic'); ?></h3>
-            <p>
-                <label for="log_path" style="font-weight: 600; color: #334155;"><?php esc_html_e('Absolute server path to the .log file:', 'bunseki-analytic'); ?></label><br>
-                <input type="text" id="log_path" value="<?php echo esc_attr(ABSPATH . 'access.log'); ?>" style="width:100%; margin: 10px 0; padding: 8px; font-family: monospace; border: 1px solid #cbd5e1; border-radius: 6px;">
-                <input type="hidden" id="bunseki_import_nonce" value="<?php echo esc_attr($nonce); ?>">
-                <small style="color: #94a3b8;"><?php esc_html_e('Example: ', 'bunseki-analytic'); ?><code>/var/log/nginx/access.log</code> <?php esc_html_e( 'or', 'bunseki-analytic' ); ?> <code>/www/htdocs/w0123/logs/access.log</code></small>
-            </p>
-            
-            <button id="btn-import" class="button button-primary button-large" onclick="startImport()" style="margin-top: 15px;"><?php esc_html_e('Read & Process Log', 'bunseki-analytic'); ?></button>
-            
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 2px dashed #e2e8f0;">
-                <h3 style="font-size: 14px;"><?php esc_html_e('Automatic Background Import (Cron)', 'bunseki-analytic'); ?></h3>
-                <form method="post" action="options.php">
-                    <?php settings_fields('bunseki_importer_group'); ?>
-                    <p><?php esc_html_e('Enter a path here so Bunseki automatically imports new logs every 12 hours.', 'bunseki-analytic'); ?></p>
-                    <input type="text" name="bunseki_auto_log_path" value="<?php echo esc_attr(get_option('bunseki_auto_log_path')); ?>" style="width:100%; padding:8px;">
-                    
-                    <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #e2e8f0;">
-                        <label style="font-weight: 600; color: #334155; display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                            <input type="hidden" name="bunseki_disable_live_bots" value="0">
-                            <input type="checkbox" name="bunseki_disable_live_bots" value="1" <?php checked(get_option('bunseki_disable_live_bots', '0'), '1'); ?>>
-                            <?php esc_html_e('Disable Live Bot Tracker', 'bunseki-analytic'); ?>
-                        </label>
-                        <p style="color: #64748b; font-size: 13px; margin-top: 5px; margin-bottom: 0;"><?php echo wp_kses_post(__('Check this box if you import server logs <strong>manually</strong> or via cron. This prevents bots from being counted twice (once live, once in the log).', 'bunseki-analytic')); ?></p>
-                    </div>
-                    <?php submit_button(__('Save Settings', 'bunseki-analytic')); ?>
+    <div class="bun-wrap">
+        <?php bunseki_render_brand_header(); ?>
 
-                </form>
+        <div class="bun-nav">
+            <div class="bun-tabs-nav">
+                <a class="bun-back" href="<?php echo esc_url( admin_url( 'admin.php?page=bunseki-analytic' ) ); ?>"><span class="dashicons dashicons-arrow-left-alt"></span> <?php esc_html_e('Dashboard', 'bunseki-analytic'); ?></a>
+                <span class="bun-tab active"><?php esc_html_e('Log Importer', 'bunseki-analytic'); ?></span>
+            </div>
+        </div>
+
+        <div class="bun-grid-main">
+            <div class="bun-stack">
+                <div class="bun-card">
+                    <h3><?php esc_html_e('Import an access log', 'bunseki-analytic'); ?></h3>
+                    <p class="bun-desc"><?php esc_html_e('Imports Apache or Nginx access logs (combined format) into the Bunseki tables. The file is read in chunks, so large logs do not run into PHP time or memory limits. Days that already have live-tracked data only get bot hits, so pageviews are not counted twice.', 'bunseki-analytic'); ?></p>
+                    <label for="log_path" class="bun-label"><?php esc_html_e('Absolute server path to the .log file:', 'bunseki-analytic'); ?></label>
+                    <input type="text" id="log_path" class="bun-input bun-mono" value="<?php echo esc_attr( get_option( 'bunseki_auto_log_path' ) ?: ABSPATH . 'access.log' ); ?>">
+                    <input type="hidden" id="bunseki_import_nonce" value="<?php echo esc_attr($nonce); ?>">
+                    <p class="bun-hint"><?php esc_html_e('Example: ', 'bunseki-analytic'); ?><code>/var/log/nginx/access.log</code></p>
+
+                    <div><button id="btn-import" class="button button-primary" onclick="startImport()"><?php esc_html_e('Read & Process Log', 'bunseki-analytic'); ?></button></div>
+
+                    <div id="import-progress" style="display:none; margin-top: 18px;">
+                        <p id="import-status" class="bun-status"><?php esc_html_e('Start...', 'bunseki-analytic'); ?></p>
+                        <div class="bun-progress"><div id="import-bar"></div></div>
+                    </div>
+                </div>
             </div>
 
-            <div id="import-progress" style="display:none; margin-top: 25px;">
-                <p id="import-status" style="font-weight:600; color:#0f1720;"><?php esc_html_e('Start...', 'bunseki-analytic'); ?></p>
-                <div style="width:100%; height:12px; background:#e2e8f0; border-radius:99px; overflow:hidden;">
-                    <div id="import-bar" style="height:100%; width:0%; background:#06b6d4;"></div>
+            <div class="bun-stack">
+                <div class="bun-card">
+                    <h3><?php esc_html_e('Automatic Background Import (Cron)', 'bunseki-analytic'); ?></h3>
+                    <form method="post" action="options.php">
+                        <?php settings_fields('bunseki_importer_group'); ?>
+                        <p class="bun-desc"><?php esc_html_e('Enter a path here so Bunseki automatically imports new logs every 12 hours.', 'bunseki-analytic'); ?></p>
+                        <input type="text" name="bunseki_auto_log_path" class="bun-input bun-mono" value="<?php echo esc_attr(get_option('bunseki_auto_log_path')); ?>" placeholder="/var/log/nginx/access.log">
+                        <?php submit_button(__('Save Settings', 'bunseki-analytic'), 'primary', 'submit', false); ?>
+                    </form>
+                </div>
+                <div class="bun-card">
+                    <h3><?php esc_html_e('WP-CLI', 'bunseki-analytic'); ?></h3>
+                    <p class="bun-desc"><?php esc_html_e('For very large or compressed logs (.gz), run the import on the server as the PHP-FPM user of the site:', 'bunseki-analytic'); ?></p>
+                    <code class="bun-code">wp bunseki parse_log /var/log/nginx/access.log.2.gz</code>
                 </div>
             </div>
         </div>
@@ -627,7 +654,7 @@ function bunseki_render_importer() {
                     processChunk(file);
                 }
             } else {
-                var msg = (data && data.data) ? data.data : ((data && data.message) ? data.message : __('Unknown error', 'bunseki-analytic'));
+                var msg = (data && data.data) ? data.data : ((data && data.message) ? data.message : '<?php echo esc_js(__("Unknown error", "bunseki-analytic")); ?>');
                 alert('<?php echo esc_js(__("Error: ", "bunseki-analytic")); ?>' + msg);
                 document.getElementById('btn-import').disabled = false;
             }
@@ -647,13 +674,13 @@ add_action('wp_ajax_bunseki_import_log', 'bunseki_ajax_import_log');
 function bunseki_ajax_import_log() {
     if (!current_user_can('manage_options')) wp_send_json_error(__('Access denied.', 'bunseki-analytic'));
 
-    // CSRF-Schutz
+    // CSRF protection
     check_ajax_referer('bunseki_import_log', 'nonce');
     
     // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotValidated, WordPress.Security.ValidatedSanitizedInput.MissingUnslash
-    $file = sanitize_text_field($_POST['file']);
+    $file = sanitize_text_field(wp_unslash($_POST['file'] ?? ''));
 
-    // Pfad-Whitelist: nur Dateien innerhalb des Auto-Log-Verzeichnisses zulassen
+    // Path whitelist: only files inside the auto-import log directory (or ABSPATH if none is set)
     $auto_path = get_option('bunseki_auto_log_path');
     $allowed_base = $auto_path ? realpath(dirname($auto_path)) : realpath(ABSPATH);
     $real_file = realpath($file);
@@ -662,114 +689,39 @@ function bunseki_ajax_import_log() {
     }
     $file = $real_file;
     // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotValidated
-    $offset = intval($_POST['offset']);
+    $offset = max(0, intval($_POST['offset'] ?? 0));
     
     if (!file_exists($file) || !is_readable($file)) {
         wp_send_json_error(__('File not found or server permissions (open_basedir) block reading.', 'bunseki-analytic'));
     }
-    
+    if (substr($file, -3) === '.gz') {
+        wp_send_json_error(__('Compressed .gz logs can only be imported via WP-CLI: wp bunseki parse_log <file>', 'bunseki-analytic'));
+    }
+
     // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
     $handle = fopen($file, 'r');
     if (!$handle) wp_send_json_error(__('Could not open file.', 'bunseki-analytic'));
-    
-    if ($offset > 0) fseek($handle, $offset);
-    
-    $lines = 0;
-    $parsed = 0;
-    $batch_bots = [];
-    $batch_users = [];
-    
-    // Nginx / Apache Combined Log Format Regex
-    $regex = '/^(\S+)\s+\S+\s+\S+\s+\[(.*?)\]\s+"(.*?)"\s+(\d{3})\s+(\S+)\s+"(.*?)"\s+"(.*?)"/';
-    
-    while (($line = fgets($handle)) !== false) {
-        $lines++;
-        if (preg_match($regex, $line, $matches)) {
-            $ip = $matches[1];
-            $clean_date = str_replace('/', '-', $matches[2]); 
-            $date_str = preg_replace('/:/', ' ', $clean_date, 1); 
-            $req = explode(' ', $matches[3]);
-            $url = isset($req[1]) ? substr($req[1], 0, 255) : '/';
-            
-            // --- FIX: Statische Dateien ignorieren ---
-            // phpcs:ignore WordPress.WP.AlternativeFunctions.parse_url_parse_url
-            $path_only = parse_url($url, PHP_URL_PATH);
-            if (preg_match('/\.(css|js|jpg|jpeg|png|gif|webp|svg|ico|woff|woff2|ttf|eot|mp4|webm|mp3)$/i', (string)$path_only)) {
-                if ($lines >= 2500) break;
-                continue;
-            }
 
-            $status = intval($matches[4]);
-            $ref = $matches[6];
-            $ua = $matches[7];
-            
-            // phpcs:ignore WordPress.DateTime.RestrictedFunctions.date_date
-            $time = date('Y-m-d H:i:s', strtotime($date_str));
-            // phpcs:ignore WordPress.DateTime.RestrictedFunctions.date_date
-            $log_date = date('Y-m-d', strtotime($date_str));
-            
-            $bot_name = Bunseki_Helper::detect_bot($ua);
-            if ($bot_name) {
-                // Aggregiere Bots sofort (wie in der cli.php)
-                $key = $log_date . '|' . $bot_name . '|' . $url . '|' . $status;
-                if (!isset($batch_bots[$key])) $batch_bots[$key] = ['hits'=>0, 'date'=>$log_date, 'bot'=>$bot_name, 'url'=>$url, 'status'=>$status];
-                $batch_bots[$key]['hits']++;
-            } elseif ( ! Bunseki_Helper::is_countable_pageview( $req[0] ?? 'GET', (string) $path_only, $status, $log_date ) ) {
-                // Not a real human pageview (noise, non-GET, redirect) or day already covered by live tracking.
-            } else {
-                // Menschlicher User -> Hash generieren (DSGVO konform)
-                $salt = defined('NONCE_SALT') ? NONCE_SALT : 'BUNSEKI_SECURE_SALT';
-                $hash = md5($ip . $ua . $log_date . $salt);
-                $device = (stripos($ua, 'mobile')!==false || stripos($ua, 'android')!==false || stripos($ua, 'iphone')!==false) ? 'Mobile' : 'Desktop';
-                
-                $batch_users[] = [
-                    'time' => $time,
-                    'url' => $url,
-                    'referrer' => ($ref !== '-') ? substr($ref, 0, 255) : '',
-                    'hash' => $hash,
-                    'device' => $device,
-                    'status' => $status
-                ];
-            }
-            $parsed++;
-        }
-        
-        // Verarbeite exakt 2.500 Zeilen pro Durchlauf, um Timeouts zu vermeiden
-        if ($lines >= 2500) break;
+    if ($offset > 0) fseek($handle, $offset);
+
+    // Process exactly 2,500 lines per request to stay clear of timeouts.
+    $parser = new Bunseki_Log_Parser();
+    $lines  = 0;
+    while ($lines < 2500 && ($line = fgets($handle)) !== false) {
+        $lines++;
+        $parser->add_line($line);
     }
-    
+
     $new_offset = ftell($handle);
-    $is_done = feof($handle);
+    $is_done    = feof($handle) || fgets($handle) === false;
     // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
     fclose($handle);
-    
-    // Batch Insert in die Datenbank
-    global $wpdb;
-    $tbl_bot = $wpdb->prefix . 'bunseki_bots';
-    $tbl_usr = $wpdb->prefix . 'bunseki_log';
-    $now = current_time('mysql');
-    
-    if (!empty($batch_bots)) {
-        foreach ($batch_bots as $row) {
-            // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.NoCaching
-            $wpdb->query($wpdb->prepare("INSERT INTO $tbl_bot (date, bot_name, url, hits, status, last_seen) VALUES (%s, %s, %s, %d, %d, %s) ON DUPLICATE KEY UPDATE hits = hits + %d, last_seen = %s", $row['date'], $row['bot'], $row['url'], $row['hits'], $row['status'], $now, $row['hits'], $now));
-        }
+
+    $parser->flush();
+    if ($parser->last_error !== '') {
+        wp_send_json_error(__('DATABASE ERROR: ', 'bunseki-analytic') . $parser->last_error);
     }
-    
-    if (!empty($batch_users)) {
-        foreach ($batch_users as $u) {
-            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-            $wpdb->insert($tbl_usr, [
-                'time' => $u['time'],
-                'url' => $u['url'],
-                'referrer' => $u['referrer'],
-                'hash' => $u['hash'],
-                'device' => $u['device'],
-                'status' => $u['status']
-            ]);
-        }
-    }
-    
+
     if ($is_done) { bunseki_clear_dashboard_cache(); }
-    wp_send_json_success(['offset' => $new_offset, 'done' => $is_done, 'parsed' => $parsed]);
+    wp_send_json_success(['offset' => $new_offset, 'done' => $is_done, 'parsed' => $parser->parsed]);
 }
